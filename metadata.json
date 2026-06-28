@@ -1,0 +1,6 @@
+{
+  "name": "KE Presensi",
+  "description": "KE Teacher Attendance & Honor Management System",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

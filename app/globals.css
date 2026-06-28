@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .bg-glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+  }
+  .btn-3d {
+    @apply relative transition-all duration-150 ease-out 
+           shadow-[0_4px_0_0_#0d9488] active:shadow-[0_0px_0_0_#0d9488] active:translate-y-1 
+           bg-teal-500 text-white font-medium border border-teal-600;
+  }
+  .btn-3d-outline {
+    @apply relative transition-all duration-150 ease-out 
+           shadow-[0_4px_0_0_#e5e7eb] active:shadow-[0_0px_0_0_#e5e7eb] active:translate-y-1 
+           bg-white text-gray-800 font-medium border border-gray-200;
+  }
+  .card-3d {
+    @apply bg-white rounded-2xl border-2 border-gray-100 shadow-[0_8px_0_0_#e5e7eb] transition-all hover:translate-y-[-2px] hover:shadow-[0_12px_0_0_#e5e7eb];
+  }
+  .animate-blob {
+    animation: blob 7s infinite;
+  }
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-slip,
+  #printable-slip * {
+    visibility: visible;
+  }
+  #printable-slip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
