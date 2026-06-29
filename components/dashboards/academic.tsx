@@ -489,6 +489,7 @@ function StudentDataTab({
   const [newStudent, setNewStudent] = useState({
     name: "",
     program: programs[0] || "ELC",
+    className: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -497,7 +498,7 @@ function StudentDataTab({
     setLoading(true);
     const { createStudent } = await import("@/app/actions");
     await createStudent(newStudent);
-    setNewStudent({ name: "", program: programs[0] || "ELC" });
+    setNewStudent({ name: "", program: programs[0] || "ELC", className: "" });
     setIsCreating(false);
     setLoading(false);
     onStudentCreated();
@@ -516,7 +517,7 @@ function StudentDataTab({
           <CardHeader>
             <CardTitle className="text-teal-800">Data Siswa Baru</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium mb-1 block">
                 Nama Siswa
@@ -548,6 +549,20 @@ function StudentDataTab({
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Nama Kelas
+              </label>
+              <input
+                type="text"
+                className="w-full border rounded-md p-2 text-sm bg-white"
+                value={newStudent.className}
+                onChange={(e) =>
+                  setNewStudent({ ...newStudent, className: e.target.value })
+                }
+                placeholder="Misal: 12-IPA-1, 10-A, dll..."
+              />
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-2 border-t border-teal-100 pt-4">
@@ -585,11 +600,16 @@ function StudentDataTab({
                 >
                   <div>
                     <p className="font-medium text-gray-900">{student.name}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    {student.className ? (
+                      <p className="text-xs font-semibold text-teal-600 mt-0.5">
+                        Kelas: {student.className}
+                      </p>
+                    ) : null}
+                    <p className="text-[10px] text-gray-400 mt-0.5">
                       ID: {student.id}
                     </p>
                   </div>
-                  <Badge variant="outline" className="bg-gray-50">
+                  <Badge variant="outline" className="bg-gray-50 shrink-0">
                     {prog}
                   </Badge>
                 </Card>

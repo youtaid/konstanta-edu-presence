@@ -107,11 +107,14 @@ export default function Home() {
         .eq("id", userUid)
         .single();
 
-      if (profileError) {
+      if (profileError || !profile) {
         console.error("Error checking profile", profileError);
+        setError("Profil Anda tidak ditemukan di database. Pastikan tabel 'profiles' di Supabase sudah dibuat dan di-seed.");
+        setIsSubmitting(false);
+        return;
       }
 
-      if (profile?.must_change_password) {
+      if (profile.must_change_password) {
         window.location.href = `/change-password?email=${encodeURIComponent(email)}`;
         return;
       }
@@ -145,7 +148,7 @@ export default function Home() {
       login(mappedUser);
     } catch (err) {
       console.error(err);
-      setError("Terjadi kesalahan sistem saat memproses login.");
+      setError("Terjadi kesalahan sistem: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSubmitting(false);
     }

@@ -28,6 +28,7 @@ export type Student = {
   id: string;
   name: string;
   program: string;
+  className?: string;
 };
 
 export type ScheduleStatus =
