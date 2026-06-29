@@ -23,13 +23,7 @@ import {
   Sparkles
 } from "lucide-react";
 
-// Mock user options for backward compatibility / quick testing
-const initialMockUsers: User[] = [
-  { id: 'U1', name: 'Admin Utama (Mock)', email: 'admin@konstanta.edu', role: 'ADMIN' },
-  { id: 'U2', name: 'Staf Akademik (Mock)', email: 'akademik@konstanta.edu', role: 'ACADEMIC' },
-  { id: 'U3', name: 'Budi Santoso (Mock TETAP)', email: 'budi@konstanta.edu', role: 'TEACHER', teacherId: 'T1', teacherType: 'TETAP', baseSalary: 3500000, transportAllowance: 500000, otherAllowance: 200000, bpjsKetenagakerjaan: 70000, bpjsKesehatan: 35000 },
-  { id: 'U4', name: 'Siti Aminah (Mock Freelance)', email: 'siti@konstanta.edu', role: 'TEACHER', teacherId: 'T2', teacherType: 'FREELANCE' },
-];
+
 
 function KaryawanDashboard({ user }: { user: User }) {
   return (
@@ -60,8 +54,7 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Quick Mock Login visibility toggle
-  const [showQuickLogin, setShowQuickLogin] = useState(false);
+
 
   async function handleRealLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -260,34 +253,7 @@ export default function Home() {
             </Button>
           </form>
 
-          {/* Quick Mock Login Option */}
-          <div className="mt-8 pt-6 border-t border-gray-200/60 text-center">
-            <button
-              type="button"
-              onClick={() => setShowQuickLogin(!showQuickLogin)}
-              className="text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors"
-            >
-              {showQuickLogin ? "Sembunyikan Akses Cepat" : "Akses Cepat (Developer/Uji Coba Mock)"}
-            </button>
 
-            {showQuickLogin ? (
-              <div className="mt-4 space-y-2 text-left">
-                {initialMockUsers.map((u) => (
-                  <button
-                    key={u.id}
-                    className="w-full text-xs bg-gray-50 border border-gray-200/60 hover:bg-teal-50 hover:border-teal-200 p-2.5 rounded-xl flex items-center justify-between transition-all"
-                    onClick={() => login(u)}
-                  >
-                    <div>
-                      <div className="font-bold text-gray-700">{u.name}</div>
-                      <div className="text-gray-400 text-[10px] mt-0.5">{u.role}</div>
-                    </div>
-                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6"/></svg>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
         </div>
       </main>
     );
