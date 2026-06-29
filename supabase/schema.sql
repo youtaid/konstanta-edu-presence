@@ -116,10 +116,10 @@ DROP POLICY IF EXISTS "Admins can manage profiles" ON public.profiles;
 CREATE POLICY "Admins can manage profiles"
   ON public.profiles FOR ALL
   USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
+    -- Read the role from the JWT (set via raw_app_meta_data at login), not from
+    -- public.profiles itself: querying profiles from within a profiles policy
+    -- causes "infinite recursion detected in policy for relation profiles".
+    (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
   );
 
 -- Settings policies
