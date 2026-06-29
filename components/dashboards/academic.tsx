@@ -9,7 +9,7 @@ import {
   getPrograms,
   getStudents,
 } from "@/app/actions";
-import { Schedule, User, Student } from "@/lib/types";
+import { Schedule, User, Student, HonorType } from "@/lib/types";
 import {
   Card,
   CardContent,
@@ -20,6 +20,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CheckCircle, FileText, XCircle, Pencil, Trash2 } from "lucide-react";
+
+// A KETetap session counts as "Sesi Wajib" (no extra honor) only when the
+// teacher's work hours are configured AND the session's start time falls
+// inside them. Otherwise Akademik must pick FULL (100%) or HALF (50%) honor.
+function isWithinWorkHours(startTime: string, teacher: User | undefined) {
+  if (!teacher || teacher.teacherType !== "TETAP") return false;
+  if (!teacher.workStartTime || !teacher.workEndTime) return false;
+  return startTime >= teacher.workStartTime && startTime < teacher.workEndTime;
+}
 
 export default function AcademicDashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -46,6 +55,7 @@ export default function AcademicDashboard() {
     students: [] as { id: string; name: string }[],
     branch: "Tebet",
     honorAmount: 150000,
+    honorType: "FULL" as HonorType,
   });
 
   const loadData = useCallback(async () => {
@@ -68,8 +78,21 @@ export default function AcademicDashboard() {
     loadData();
   }, [loadData]);
 
+  const selectedTeacher = teachers.find((t) => t.teacherId === newSchedule.teacherId);
+  const withinWorkHours = isWithinWorkHours(newSchedule.startTime, selectedTeacher);
+  const effectiveHonorType: HonorType =
+    selectedTeacher?.teacherType !== "TETAP"
+      ? "FULL"
+      : withinWorkHours
+        ? "WAJIB"
+        : newSchedule.honorType;
+
   const handleCreate = async () => {
-    await createSchedule(newSchedule);
+    await createSchedule({
+      ...newSchedule,
+      honorType: effectiveHonorType,
+      honorAmount: effectiveHonorType === "WAJIB" ? 0 : newSchedule.honorAmount,
+    });
     setIsCreating(false);
     loadData();
   };
@@ -235,6 +258,69 @@ export default function AcademicDashboard() {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-1 block">
+                    Jenis Honor
+                  </label>
+                  {selectedTeacher?.teacherType === "TETAP" ? (
+                    withinWorkHours ? (
+                      <p className="text-sm bg-teal-50 border border-teal-200 text-teal-800 rounded-md p-2">
+                        Sesi Wajib (Dalam Jam Kerja {selectedTeacher.workStartTime}–
+                        {selectedTeacher.workEndTime}) — tidak ada honor
+                        tambahan, sudah termasuk gaji pokok.
+                      </p>
+                    ) : (
+                      <>
+                        <select
+                          className="w-full border rounded-md p-2 text-sm bg-white"
+                          value={newSchedule.honorType === "WAJIB" ? "FULL" : newSchedule.honorType}
+                          onChange={(e) =>
+                            setNewSchedule({
+                              ...newSchedule,
+                              honorType: e.target.value as HonorType,
+                            })
+                          }
+                        >
+                          <option value="FULL">Diluar Jam Kerja - 100% Honor</option>
+                          <option value="HALF">Diluar Jam Kerja - 50% Honor</option>
+                        </select>
+                        {!selectedTeacher.workStartTime || !selectedTeacher.workEndTime ? (
+                          <p className="text-xs text-amber-600 mt-1">
+                            Jam kerja guru ini belum diatur di Data Guru — pilih jenis honor secara manual.
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Diluar jam kerja guru ini ({selectedTeacher.workStartTime}–{selectedTeacher.workEndTime}).
+                          </p>
+                        )}
+                      </>
+                    )
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      KangGuru (freelance) selalu dibayar 100% honor per sesi.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">
+                    Nominal Honor (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                    value={effectiveHonorType === "WAJIB" ? 0 : newSchedule.honorAmount}
+                    disabled={effectiveHonorType === "WAJIB"}
+                    onChange={(e) =>
+                      setNewSchedule({
+                        ...newSchedule,
+                        honorAmount: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+
                 {(newSchedule.program === "ELC" ||
                   newSchedule.program === "Privat") && (
                   <div className="md:col-span-2 border-t pt-3 mt-1">
@@ -430,6 +516,7 @@ export default function AcademicDashboard() {
                       <th className="px-4 py-3 font-medium">Tanggal</th>
                       <th className="px-4 py-3 font-medium">Guru</th>
                       <th className="px-4 py-3 font-medium">Program</th>
+                      <th className="px-4 py-3 font-medium">Jenis Honor</th>
                       <th className="px-4 py-3 font-medium">Status</th>
                     </tr>
                   </thead>
@@ -445,6 +532,15 @@ export default function AcademicDashboard() {
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {s.program} - {s.subject}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={s.honorType === "WAJIB" ? "secondary" : "outline"}>
+                            {s.honorType === "WAJIB"
+                              ? "Wajib (0%)"
+                              : s.honorType === "HALF"
+                                ? "Luar Jam (50%)"
+                                : "Luar Jam (100%)"}
+                          </Badge>
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant="outline">
@@ -799,6 +895,8 @@ function TeacherDataTab({
     otherAllowance: 0,
     bpjsKetenagakerjaan: 0,
     bpjsKesehatan: 0,
+    workStartTime: "08:00",
+    workEndTime: "16:00",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -818,6 +916,8 @@ function TeacherDataTab({
       otherAllowance: 0,
       bpjsKetenagakerjaan: 0,
       bpjsKesehatan: 0,
+      workStartTime: "08:00",
+      workEndTime: "16:00",
     });
     setError(null);
     setIsCreating(false);
@@ -834,6 +934,8 @@ function TeacherDataTab({
       otherAllowance: t.otherAllowance || 0,
       bpjsKetenagakerjaan: t.bpjsKetenagakerjaan || 0,
       bpjsKesehatan: t.bpjsKesehatan || 0,
+      workStartTime: t.workStartTime || "08:00",
+      workEndTime: t.workEndTime || "16:00",
     });
     setEditingId(t.id);
     setIsCreating(true);
@@ -1024,6 +1126,36 @@ function TeacherDataTab({
                       })
                     }
                   />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">
+                    Jam Kerja Mulai
+                  </label>
+                  <input
+                    type="time"
+                    className="w-full border rounded-md p-2 text-sm bg-white"
+                    value={formData.workStartTime}
+                    onChange={(e) =>
+                      setFormData({ ...formData, workStartTime: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">
+                    Jam Kerja Selesai
+                  </label>
+                  <input
+                    type="time"
+                    className="w-full border rounded-md p-2 text-sm bg-white"
+                    value={formData.workEndTime}
+                    onChange={(e) =>
+                      setFormData({ ...formData, workEndTime: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Sesi KBM yang dijadwalkan dalam rentang jam ini otomatis
+                    dianggap Sesi Wajib (tanpa honor tambahan).
+                  </p>
                 </div>
               </>
             )}

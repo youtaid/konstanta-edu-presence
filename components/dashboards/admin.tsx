@@ -152,17 +152,31 @@ export default function AdminDashboard() {
             dailyWages: {},
           };
         }
-        acc[s.teacherId].totalHonor += s.honorAmount;
+        // For KETetap, honor_type determines how much of honorAmount actually
+        // gets paid on top of the base salary: WAJIB (in-hours) = 0%, HALF
+        // (out-of-hours) = 50%, FULL (out-of-hours) = 100%. KangGuru
+        // (freelance) always gets the full amount since it's their only pay.
+        const honorMultiplier =
+          acc[s.teacherId].teacherType === "TETAP"
+            ? s.honorType === "WAJIB"
+              ? 0
+              : s.honorType === "HALF"
+                ? 0.5
+                : 1
+            : 1;
+        const effectiveHonor = s.honorAmount * honorMultiplier;
+
+        acc[s.teacherId].totalHonor += effectiveHonor;
         acc[s.teacherId].sessionCount += 1;
         if (s.status === "VALIDATED") {
-          acc[s.teacherId].pendingPay += s.honorAmount;
+          acc[s.teacherId].pendingPay += effectiveHonor;
         } else if (s.status === "PAID") {
-          acc[s.teacherId].paidPay += s.honorAmount;
+          acc[s.teacherId].paidPay += effectiveHonor;
         }
         if (!acc[s.teacherId].dailyWages[s.date]) {
           acc[s.teacherId].dailyWages[s.date] = 0;
         }
-        acc[s.teacherId].dailyWages[s.date] += s.honorAmount;
+        acc[s.teacherId].dailyWages[s.date] += effectiveHonor;
       }
       return acc;
     },

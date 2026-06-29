@@ -2,6 +2,11 @@ export type Role = 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'KARYAWAN';
 
 export type TeacherType = 'TETAP' | 'FREELANCE';
 
+// WAJIB = sesi dalam jam kerja guru tetap, tidak ada honor tambahan (0%, sudah
+// termasuk gaji pokok). FULL/HALF = sesi diluar jam kerja, dibayar 100%/50%
+// honor. KangGuru (freelance) selalu diperlakukan sebagai FULL.
+export type HonorType = 'WAJIB' | 'FULL' | 'HALF';
+
 export type User = {
   id: string;
   name: string;
@@ -15,6 +20,9 @@ export type User = {
   otherAllowance?: number;
   bpjsKetenagakerjaan?: number;
   bpjsKesehatan?: number;
+  // Jam kerja standar (format "HH:MM"), untuk deteksi otomatis sesi Wajib vs Diluar Jam Kerja
+  workStartTime?: string;
+  workEndTime?: string;
 };
 
 export type Period = {
@@ -58,6 +66,7 @@ export type Schedule = {
   branch: string;
   status: ScheduleStatus;
   honorAmount: number;
+  honorType: HonorType;
   report?: {
     materialTaught: string;
     understandingLevel: string;

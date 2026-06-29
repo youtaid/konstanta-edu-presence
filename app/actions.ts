@@ -46,6 +46,8 @@ export async function getUsers() {
       user.otherAllowance = Number(profile.other_allowance || 0);
       user.bpjsKetenagakerjaan = Number(profile.bpjs_ketenagakerjaan || 0);
       user.bpjsKesehatan = Number(profile.bpjs_kesehatan || 0);
+      user.workStartTime = profile.work_start_time || undefined;
+      user.workEndTime = profile.work_end_time || undefined;
     }
     return user;
   });
@@ -75,6 +77,7 @@ export async function getSchedules() {
     branch: s.branch,
     status: s.status as ScheduleStatus,
     honorAmount: Number(s.honor_amount || 0),
+    honorType: (s.honor_type || "FULL") as Schedule["honorType"],
     report: s.report || undefined,
     checkIn: s.check_in || undefined,
     checkOut: s.check_out || undefined,
@@ -281,6 +284,8 @@ export async function createTeacher(data: Partial<User>) {
     other_allowance: data.otherAllowance || 0,
     bpjs_ketenagakerjaan: data.bpjsKetenagakerjaan || 0,
     bpjs_kesehatan: data.bpjsKesehatan || 0,
+    work_start_time: data.workStartTime || null,
+    work_end_time: data.workEndTime || null,
   });
 
   if (profileError) {
@@ -308,6 +313,8 @@ export async function updateTeacher(id: string, data: Partial<User>) {
   if (data.otherAllowance !== undefined) updateData.other_allowance = data.otherAllowance;
   if (data.bpjsKetenagakerjaan !== undefined) updateData.bpjs_ketenagakerjaan = data.bpjsKetenagakerjaan;
   if (data.bpjsKesehatan !== undefined) updateData.bpjs_kesehatan = data.bpjsKesehatan;
+  if (data.workStartTime !== undefined) updateData.work_start_time = data.workStartTime || null;
+  if (data.workEndTime !== undefined) updateData.work_end_time = data.workEndTime || null;
 
   const { error: profileError } = await admin
     .from("profiles")
@@ -435,7 +442,8 @@ export async function createSchedule(data: Omit<Schedule, "id" | "status">) {
       students_data: data.students || null,
       branch: data.branch,
       status: "WAITING_APPROVAL",
-      honor_amount: data.honorAmount
+      honor_amount: data.honorAmount,
+      honor_type: data.honorType || "FULL"
     });
   revalidatePath("/");
 }

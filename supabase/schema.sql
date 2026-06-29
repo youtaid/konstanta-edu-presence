@@ -15,6 +15,11 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   other_allowance NUMERIC DEFAULT 0,
   bpjs_ketenagakerjaan NUMERIC DEFAULT 0,
   bpjs_kesehatan NUMERIC DEFAULT 0,
+  -- Standard working hours for KETetap teachers, stored as "HH:MM" text (same
+  -- convention as schedules.start_time/end_time). Used to auto-detect whether a
+  -- KBM session falls inside or outside the teacher's normal work hours.
+  work_start_time TEXT,
+  work_end_time TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -27,6 +32,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS transport_allowance NUMERIC
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS other_allowance NUMERIC DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bpjs_ketenagakerjaan NUMERIC DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bpjs_kesehatan NUMERIC DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS work_start_time TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS work_end_time TEXT;
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
@@ -79,11 +86,18 @@ CREATE TABLE IF NOT EXISTS public.schedules (
   branch TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('DRAFT', 'WAITING_APPROVAL', 'APPROVED', 'REJECTED', 'IN_PROGRESS', 'WAITING_VERIFICATION', 'VERIFIED', 'WAITING_VALIDATION', 'VALIDATED', 'PAID')),
   honor_amount NUMERIC NOT NULL DEFAULT 0,
+  -- For KETetap teachers only: WAJIB = inside normal work hours, no honor on
+  -- top of base salary (0%); FULL = outside work hours, 100% honor; HALF =
+  -- outside work hours, 50% honor. Always FULL for KangGuru (freelance), whose
+  -- entire pay comes from honor_amount regardless of this field.
+  honor_type TEXT NOT NULL DEFAULT 'FULL' CHECK (honor_type IN ('WAJIB', 'FULL', 'HALF')),
   report JSONB, -- lesson report details
   check_in JSONB, -- check in coordinate & time
   check_out JSONB, -- check out coordinate & time
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS honor_type TEXT NOT NULL DEFAULT 'FULL' CHECK (honor_type IN ('WAJIB', 'FULL', 'HALF'));
 
 ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
 
