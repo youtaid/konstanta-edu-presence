@@ -178,6 +178,29 @@ export async function createStudent(data: Omit<Student, "id">) {
   revalidatePath("/");
 }
 
+export async function updateStudent(id: string, data: Partial<Student>) {
+  const supabase = await getSupabase();
+  const updateData: any = {};
+  if (data.name) updateData.name = data.name;
+  if (data.program) updateData.program = data.program;
+  if (data.className !== undefined) updateData.class_name = data.className || null;
+
+  await supabase
+    .from("students")
+    .update(updateData)
+    .eq("id", id);
+  revalidatePath("/");
+}
+
+export async function deleteStudent(id: string) {
+  const supabase = await getSupabase();
+  await supabase
+    .from("students")
+    .delete()
+    .eq("id", id);
+  revalidatePath("/");
+}
+
 export async function createPeriod(data: Omit<Period, "id">) {
   const supabase = await getSupabase();
   const id = `P${Date.now()}`;
