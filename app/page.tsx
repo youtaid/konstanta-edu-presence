@@ -311,8 +311,8 @@ export default function Home() {
               KE Presensi
             </h1>
             <p className="text-xs font-medium text-teal-700">
-              {user.name} <span className="text-gray-400 px-1">•</span>{" "}
-              {user.role}
+              {user?.name} <span className="text-gray-400 px-1">•</span>{" "}
+              {user?.role}
             </p>
           </div>
         </div>
@@ -326,10 +326,10 @@ export default function Home() {
       </header>
 
       <main className="flex-1 px-4 pb-12 md:px-6 lg:max-w-6xl mx-auto w-full relative z-10">
-        {user.role === "ADMIN" && <AdminDashboard />}
-        {user.role === "ACADEMIC" && <AcademicDashboard />}
-        {user.role === "TEACHER" && <TeacherDashboard />}
-        {user.role === "KARYAWAN" && <KaryawanDashboard user={user} />}
+        {user?.role === "ADMIN" && <AdminDashboard />}
+        {user?.role === "ACADEMIC" && <AcademicDashboard />}
+        {user?.role === "TEACHER" && <TeacherDashboard />}
+        {user?.role === "KARYAWAN" && <KaryawanDashboard user={user!} />}
       </main>
     </div>
   );
