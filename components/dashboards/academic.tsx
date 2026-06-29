@@ -642,6 +642,12 @@ function TeacherDataTab({
     bpjsKesehatan: 0,
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string;
+    email: string;
+    password: string;
+  } | null>(null);
 
   const resetForm = () => {
     setFormData({
@@ -654,6 +660,7 @@ function TeacherDataTab({
       bpjsKetenagakerjaan: 0,
       bpjsKesehatan: 0,
     });
+    setError(null);
     setIsCreating(false);
     setEditingId(null);
   };
@@ -683,17 +690,29 @@ function TeacherDataTab({
   const handleSave = async () => {
     if (!formData.name || !formData.email) return;
     setLoading(true);
+    setError(null);
     const { createTeacher, updateTeacher } = await import("@/app/actions");
 
-    if (editingId) {
-      await updateTeacher(editingId, formData);
-    } else {
-      await createTeacher(formData);
+    try {
+      if (editingId) {
+        await updateTeacher(editingId, formData);
+        resetForm();
+      } else {
+        const result = await createTeacher(formData);
+        setCreatedCredentials({
+          name: formData.name || "",
+          email: result.email,
+          password: result.password,
+        });
+        setIsCreating(false);
+        setEditingId(null);
+      }
+      onTeacherUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan data guru.");
+    } finally {
+      setLoading(false);
     }
-
-    resetForm();
-    setLoading(false);
-    onTeacherUpdated();
   };
 
   return (
@@ -710,7 +729,17 @@ function TeacherDataTab({
             <CardTitle className="text-teal-800">
               {editingId ? "Edit Data Guru" : "Data Guru Baru"}
             </CardTitle>
+            {!editingId && (
+              <p className="text-sm text-teal-700/80">
+                Akun login akan dibuat otomatis (KangGuru/KETetap) dengan password awal yang wajib diganti saat login pertama.
+              </p>
+            )}
           </CardHeader>
+          {error && (
+            <div className="mx-6 mb-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg">
+              {error}
+            </div>
+          )}
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-1 block">
@@ -902,6 +931,50 @@ function TeacherDataTab({
           </tbody>
         </table>
       </div>
+
+      {createdCredentials && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle className="text-teal-800">Akun Guru Dibuat</CardTitle>
+              <p className="text-sm text-gray-500">
+                Bagikan kredensial ini ke {createdCredentials.name}. Password
+                wajib diganti saat login pertama dan tidak dapat dilihat lagi
+                setelah ini ditutup.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Email Login
+                </label>
+                <p className="font-mono text-sm bg-gray-100 rounded-md p-2 mt-1">
+                  {createdCredentials.email}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Password Awal
+                </label>
+                <p className="font-mono text-sm bg-gray-100 rounded-md p-2 mt-1">
+                  {createdCredentials.password}
+                </p>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-4">
+              <Button
+                className="w-full bg-teal-600 hover:bg-teal-700"
+                onClick={() => {
+                  setCreatedCredentials(null);
+                  resetForm();
+                }}
+              >
+                Tutup
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

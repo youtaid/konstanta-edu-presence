@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { cookies } from "next/headers";
 import { Schedule, ScheduleStatus, User, Student, Period } from "@/lib/types";
 import { revalidatePath } from "next/cache";
@@ -8,6 +9,11 @@ import { revalidatePath } from "next/cache";
 async function getSupabase() {
   const cookieStore = await cookies();
   return createSupabaseClient(cookieStore);
+}
+
+function generateInitialPassword() {
+  const digits = Math.floor(1000 + Math.random() * 9000);
+  return `Konstanta${digits}`;
 }
 
 export async function getUsers() {
@@ -209,54 +215,106 @@ export async function deletePeriod(id: string) {
   revalidatePath("/");
 }
 
+// Creates a real Supabase Auth login (email + initial password) for a
+// KangGuru (FREELANCE) or KETetap (TETAP) teacher, plus their payroll
+// profile row. Returns the generated password so the caller can hand it
+// to the new teacher; it cannot be retrieved again afterwards.
 export async function createTeacher(data: Partial<User>) {
-  const supabase = await getSupabase();
-  // Generate random UUID for non-login profile
-  const id = crypto.randomUUID();
+  if (!data.email) {
+    throw new Error("Email wajib diisi untuk membuat akun login guru.");
+  }
+
+  const admin = createAdminClient();
+  const role = data.teacherType === "TETAP" ? "ketetap" : "kangguru";
+  const password = generateInitialPassword();
   const teacherId = `T${Date.now()}`;
 
-  await supabase
-    .from("profiles")
-    .insert({
-      id,
-      role: 'ketetap', // Default to ketetap teacher role
-      full_name: data.name || "",
-      must_change_password: true,
-      teacher_id: teacherId,
-      teacher_type: data.teacherType || 'FREELANCE',
-      base_salary: data.baseSalary || 0,
-      transport_allowance: data.transportAllowance || 0,
-      other_allowance: data.otherAllowance || 0,
-      bpjs_ketenagakerjaan: data.bpjsKetenagakerjaan || 0,
-      bpjs_kesehatan: data.bpjsKesehatan || 0
-    });
+  const { data: created, error: authError } = await admin.auth.admin.createUser({
+    email: data.email,
+    password,
+    email_confirm: true,
+    app_metadata: {
+      provider: "email",
+      providers: ["email"],
+      role,
+      roles: [role],
+    },
+    user_metadata: { full_name: data.name || "" },
+  });
+
+  if (authError || !created.user) {
+    throw new Error(authError?.message || "Gagal membuat akun login guru.");
+  }
+
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: created.user.id,
+    role,
+    full_name: data.name || "",
+    must_change_password: true,
+    teacher_id: teacherId,
+    teacher_type: data.teacherType || "FREELANCE",
+    base_salary: data.baseSalary || 0,
+    transport_allowance: data.transportAllowance || 0,
+    other_allowance: data.otherAllowance || 0,
+    bpjs_ketenagakerjaan: data.bpjsKetenagakerjaan || 0,
+    bpjs_kesehatan: data.bpjsKesehatan || 0,
+  });
+
+  if (profileError) {
+    // Don't leave an orphaned login with no profile behind.
+    await admin.auth.admin.deleteUser(created.user.id);
+    throw new Error(profileError.message);
+  }
+
   revalidatePath("/");
+  return { email: data.email, password };
 }
 
 export async function updateTeacher(id: string, data: Partial<User>) {
-  const supabase = await getSupabase();
+  const admin = createAdminClient();
   const updateData: any = {};
   if (data.name) updateData.full_name = data.name;
-  if (data.teacherType) updateData.teacher_type = data.teacherType;
+  let role: string | undefined;
+  if (data.teacherType) {
+    updateData.teacher_type = data.teacherType;
+    role = data.teacherType === "TETAP" ? "ketetap" : "kangguru";
+    updateData.role = role;
+  }
   if (data.baseSalary !== undefined) updateData.base_salary = data.baseSalary;
   if (data.transportAllowance !== undefined) updateData.transport_allowance = data.transportAllowance;
   if (data.otherAllowance !== undefined) updateData.other_allowance = data.otherAllowance;
   if (data.bpjsKetenagakerjaan !== undefined) updateData.bpjs_ketenagakerjaan = data.bpjsKetenagakerjaan;
   if (data.bpjsKesehatan !== undefined) updateData.bpjs_kesehatan = data.bpjsKesehatan;
 
-  await supabase
+  const { error: profileError } = await admin
     .from("profiles")
     .update(updateData)
     .eq("id", id);
+  if (profileError) throw new Error(profileError.message);
+
+  const authUpdate: Record<string, unknown> = {};
+  if (data.email) authUpdate.email = data.email;
+  if (data.name) authUpdate.user_metadata = { full_name: data.name };
+  if (role) {
+    authUpdate.app_metadata = {
+      provider: "email",
+      providers: ["email"],
+      role,
+      roles: [role],
+    };
+  }
+  if (Object.keys(authUpdate).length > 0) {
+    const { error: authError } = await admin.auth.admin.updateUserById(id, authUpdate);
+    if (authError) throw new Error(authError.message);
+  }
+
   revalidatePath("/");
 }
 
 export async function deleteTeacher(id: string) {
-  const supabase = await getSupabase();
-  await supabase
-    .from("profiles")
-    .delete()
-    .eq("id", id);
+  const admin = createAdminClient();
+  await admin.from("profiles").delete().eq("id", id);
+  await admin.auth.admin.deleteUser(id);
   revalidatePath("/");
 }
 

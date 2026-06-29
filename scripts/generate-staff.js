@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 
 // 1. Raw lists of names under each role from the spreadsheet
 const adminNames = [
@@ -134,20 +133,44 @@ function generatePassword() {
   return `Konstanta${digits}`;
 }
 
+// Re-use whatever password is already documented for an email so that
+// re-running this generator never invalidates credentials that were already
+// handed out / already seeded into Supabase. Only brand-new accounts (not
+// present in the existing doc) get a freshly generated password.
+function loadExistingPasswords() {
+  const mdPath = path.join(__dirname, '../generated_credentials.md');
+  const byEmail = new Map();
+  if (!fs.existsSync(mdPath)) return byEmail;
+
+  const lines = fs.readFileSync(mdPath, 'utf8').split('\n');
+  for (const line of lines) {
+    if (!line.startsWith('|')) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (cells.length !== 4) continue;
+    // Staff rows look like: | Name | `email` | Roles | `password` |
+    // Demo rows look like:  | Role | Name | `email` | `password` |
+    const emailCell = cells.find((c) => /^`.+@.+`$/.test(c));
+    const passwordCell = [...cells].reverse().find((c) => /^`.+`$/.test(c) && c !== emailCell);
+    if (!emailCell || !passwordCell) continue;
+    const email = emailCell.replace(/`/g, '');
+    const password = passwordCell.replace(/`/g, '');
+    if (email.includes('@')) byEmail.set(email, password);
+  }
+  return byEmail;
+}
+
+const existingPasswords = loadExistingPasswords();
+
 // Set of all unique people mapped by name
 const people = new Map();
 
 function addPerson(name, role) {
   if (!people.has(name)) {
     const email = cleanNameForEmail(name);
-    // Generate deterministic UUID based on name for idempotency
-    const hash = crypto.createHash('md5').update(name).digest("hex");
-    const uuid = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
     people.set(name, {
-      uuid,
       name,
       email,
-      password: generatePassword(),
+      password: existingPasswords.get(email) || generatePassword(),
       roles: []
     });
   }
@@ -161,28 +184,33 @@ ketetapNames.forEach(n => addPerson(n, "ketetap"));
 kangguruNames.forEach(n => addPerson(n, "kangguru"));
 karyawanNames.forEach(n => addPerson(n, "karyawan"));
 
-// Create demo accounts
+// Demo accounts (bypass first-login password reset)
 const demoAccounts = [
-  { uuid: 'd0000000-0000-0000-0000-000000000001', name: "Demo Admin", email: "demo.admin@konstanta.my.id", password: "AdminDemo123!", roles: ["admin"] },
-  { uuid: 'd0000000-0000-0000-0000-000000000002', name: "Demo Akademik", email: "demo.akademik@konstanta.my.id", password: "AkademikDemo123!", roles: ["akademik"] },
-  { uuid: 'd0000000-0000-0000-0000-000000000003', name: "Demo KETetap", email: "demo.ketetap@konstanta.my.id", password: "KetetapDemo123!", roles: ["ketetap"] },
-  { uuid: 'd0000000-0000-0000-0000-000000000004', name: "Demo KangGuru", email: "demo.kangguru@konstanta.my.id", password: "KangguruDemo123!", roles: ["kangguru"] },
-  { uuid: 'd0000000-0000-0000-0000-000000000005', name: "Demo Karyawan", email: "demo.karyawan@konstanta.my.id", password: "KaryawanDemo123!", roles: ["karyawan"] }
+  { name: "Demo Admin", email: "demo.admin@konstanta.my.id", password: "AdminDemo123!", roles: ["admin"] },
+  { name: "Demo Akademik", email: "demo.akademik@konstanta.my.id", password: "AkademikDemo123!", roles: ["akademik"] },
+  { name: "Demo KETetap", email: "demo.ketetap@konstanta.my.id", password: "KetetapDemo123!", roles: ["ketetap"] },
+  { name: "Demo KangGuru", email: "demo.kangguru@konstanta.my.id", password: "KangguruDemo123!", roles: ["kangguru"] },
+  { name: "Demo Karyawan", email: "demo.karyawan@konstanta.my.id", password: "KaryawanDemo123!", roles: ["karyawan"] }
 ];
 
-// Generate SQL output
-let sql = `-- ============================================================
--- Konstanta Education Web — Auto-Generated Staff Seeds (konstanta.my.id)
--- Paste ke Supabase SQL Editor dan jalankan.
--- Aman dijalankan berkali-kali.
--- ============================================================
+// ============================================================
+// SQL generation
+//
+// Every statement is keyed off `email` (never off a UUID we guessed
+// client-side), and is safe to run on a fresh project AND on a project
+// that already has some/all of these accounts:
+//   - auth.users: inserted only if the email doesn't exist yet; if it
+//     already exists, only app_metadata/user_metadata are refreshed —
+//     the password is left untouched so nobody who already changed
+//     their password gets locked out.
+//   - auth.identities: inserted only if missing.
+//   - public.profiles: id is looked up from auth.users by email, so it
+//     works whether the row was just created above or already existed
+//     with some other id. must_change_password is only set when the
+//     profiles row doesn't exist yet (never reset on an existing row).
+// ============================================================
 
-DO $$
-BEGIN
-`;
-
-// Helper to build SQL inserts
-function buildUserSql(user, mustChangePassword = true) {
+function buildUserSql(user, mustChangePasswordForNewProfile) {
   const primaryRole = getPrimaryRole(user.roles);
   const appMetadata = JSON.stringify({
     provider: "email",
@@ -196,67 +224,85 @@ function buildUserSql(user, mustChangePassword = true) {
 
   return `
   -- ${user.name} (${user.roles.join(', ')})
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = '${user.uuid}') THEN
-    INSERT INTO auth.users (
-      id, instance_id, aud, role,
-      email, encrypted_password,
-      email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data,
-      is_super_admin, is_sso_user,
-      created_at, updated_at,
-      confirmation_token, recovery_token,
-      email_change_token_new, email_change
-    ) values
-    (
-      '${user.uuid}', '00000000-0000-0000-0000-000000000000',
-      'authenticated', 'authenticated',
-      '${user.email}',
-      crypt('${user.password}', gen_salt('bf')),
-      now(),
-      '${appMetadata}'::jsonb,
-      '${userMetadata}'::jsonb,
-      false, false, now(), now(), '', '', '', ''
+  INSERT INTO auth.users (
+    instance_id, aud, role,
+    email, encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data,
+    is_super_admin, is_sso_user,
+    created_at, updated_at,
+    confirmation_token, recovery_token,
+    email_change_token_new, email_change
+  )
+  SELECT
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
+    '${user.email}',
+    crypt('${user.password}', gen_salt('bf')),
+    now(),
+    '${appMetadata}'::jsonb,
+    '${userMetadata}'::jsonb,
+    false, false, now(), now(), '', '', '', ''
+  WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = '${user.email}');
+
+  UPDATE auth.users SET
+    raw_app_meta_data = '${appMetadata}'::jsonb,
+    raw_user_meta_data = '${userMetadata}'::jsonb,
+    updated_at = now()
+  WHERE email = '${user.email}';
+
+  INSERT INTO auth.identities (
+    id, user_id, provider_id, provider,
+    identity_data, last_sign_in_at,
+    created_at, updated_at
+  )
+  SELECT
+    u.id, u.id, u.email, 'email',
+    json_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true, 'provider', 'email')::jsonb,
+    now(), now(), now()
+  FROM auth.users u
+  WHERE u.email = '${user.email}'
+    AND NOT EXISTS (
+      SELECT 1 FROM auth.identities i WHERE i.provider = 'email' AND i.provider_id = u.email
     );
 
-    INSERT INTO auth.identities (
-      id, user_id, provider_id, provider,
-      identity_data, last_sign_in_at,
-      created_at, updated_at
-    ) values
-    (
-      '${user.uuid}', '${user.uuid}',
-      '${user.email}', 'email',
-      json_build_object('sub', '${user.uuid}'::text, 'email', '${user.email}', 'email_verified', true, 'provider', 'email')::jsonb,
-      now(), now(), now()
-    );
-
-    INSERT INTO public.profiles (
-      id, role, full_name, must_change_password, created_at, updated_at
-    ) values
-    (
-      '${user.uuid}', '${primaryRole}', '${user.name}', ${mustChangePassword}, now(), now()
-    );
-  END IF;
+  INSERT INTO public.profiles (id, role, full_name, must_change_password, created_at, updated_at)
+  SELECT u.id, '${primaryRole}', '${user.name}', ${mustChangePasswordForNewProfile}, now(), now()
+  FROM auth.users u
+  WHERE u.email = '${user.email}'
+  ON CONFLICT (id) DO UPDATE SET
+    role = EXCLUDED.role,
+    full_name = EXCLUDED.full_name,
+    updated_at = now();
 `;
 }
 
-// Append Demo users
-sql += `  -- --------------------------------------------------------\n  -- DEMO ACCOUNTS\n  -- --------------------------------------------------------\n`;
+let sql = `-- ============================================================
+-- Konstanta Education Web — Auto-Generated Staff Seeds (konstanta.my.id)
+-- Paste ke Supabase SQL Editor dan jalankan.
+-- Aman dijalankan berkali-kali: akun yang sudah ada hanya disinkronkan
+-- (role/nama/profil), passwordnya TIDAK akan ditimpa.
+-- ============================================================
+
+DO $$
+BEGIN
+  -- --------------------------------------------------------
+  -- DEMO ACCOUNTS
+  -- --------------------------------------------------------
+`;
 demoAccounts.forEach(demo => {
-  sql += buildUserSql(demo, false); // Demo doesn't need first login reset
+  sql += buildUserSql(demo, false);
 });
 
-// Append Staff users
 sql += `\n  -- --------------------------------------------------------\n  -- STAFF ACCOUNTS\n  -- --------------------------------------------------------\n`;
 people.forEach(person => {
-  sql += buildUserSql(person, true); // Real staff needs first login reset
+  sql += buildUserSql(person, true);
 });
 
 sql += `
 END $$;
 `;
 
-// Write seed SQL file
 fs.writeFileSync(path.join(__dirname, '../supabase/seed_staff.sql'), sql);
 console.log('Successfully generated supabase/seed_staff.sql');
 
@@ -288,6 +334,5 @@ people.forEach(person => {
   md += `| ${person.name} | \`${person.email}\` | ${rolesLabel} | \`${person.password}\` |\n`;
 });
 
-// Write Markdown file
 fs.writeFileSync(path.join(__dirname, '../generated_credentials.md'), md);
 console.log('Successfully generated generated_credentials.md');
