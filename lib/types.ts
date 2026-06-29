@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'ACADEMIC' | 'TEACHER';
+export type Role = 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'KARYAWAN';
 
 export type TeacherType = 'TETAP' | 'FREELANCE';
 
