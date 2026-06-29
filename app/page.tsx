@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/auth-provider";
 import { useEffect, useState } from "react";
 import { User } from "@/lib/types";
+import { mapProfileToUser } from "@/lib/profile-mapper";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,31 +113,10 @@ export default function Home() {
         return;
       }
 
-      // Logged in successfully! Update the AuthProvider state
-      let roleMapped: 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'KARYAWAN' = 'KARYAWAN';
-      if (profile.role === 'admin') roleMapped = 'ADMIN';
-      else if (profile.role === 'akademik') roleMapped = 'ACADEMIC';
-      else if (profile.role === 'ketetap' || profile.role === 'kangguru') roleMapped = 'TEACHER';
-
-      const mappedUser: User = {
-        id: profile.id,
-        name: profile.full_name,
-        email: email,
-        role: roleMapped,
-      };
-
-      if (profile.role === 'ketetap') {
-        mappedUser.teacherType = 'TETAP';
-        mappedUser.teacherId = 'T_' + profile.id.slice(0, 8);
-        mappedUser.baseSalary = 3500000;
-        mappedUser.transportAllowance = 500000;
-        mappedUser.otherAllowance = 200000;
-        mappedUser.bpjsKetenagakerjaan = 70000;
-        mappedUser.bpjsKesehatan = 35000;
-      } else if (profile.role === 'kangguru') {
-        mappedUser.teacherType = 'FREELANCE';
-        mappedUser.teacherId = 'T_' + profile.id.slice(0, 8);
-      }
+      // Logged in successfully! Update the AuthProvider state.
+      // Use the same mapping getUsers() uses server-side, so this teacher's
+      // own teacherId/payroll fields always match what Akademik/Admin see.
+      const mappedUser = mapProfileToUser(profile, email);
 
       login(mappedUser);
     } catch (err) {

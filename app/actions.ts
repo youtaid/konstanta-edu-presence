@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookies } from "next/headers";
 import { Schedule, ScheduleStatus, User, Student, Period } from "@/lib/types";
+import { mapProfileToUser } from "@/lib/profile-mapper";
 import { revalidatePath } from "next/cache";
 
 async function getSupabase() {
@@ -25,32 +26,8 @@ export async function getUsers() {
   
   if (!data) return [];
 
-  return data.map((profile: any) => {
-    let roleMapped: 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'KARYAWAN' = 'KARYAWAN';
-    if (profile.role === 'admin') roleMapped = 'ADMIN';
-    else if (profile.role === 'akademik') roleMapped = 'ACADEMIC';
-    else if (profile.role === 'ketetap' || profile.role === 'kangguru') roleMapped = 'TEACHER';
-
-    const user: any = {
-      id: profile.id,
-      name: profile.full_name,
-      email: "", // email not saved on profiles for privacy, or fetched via auth later
-      role: roleMapped,
-      teacherId: profile.teacher_id,
-      teacherType: profile.teacher_type,
-    };
-
-    if (profile.teacher_type === 'TETAP') {
-      user.baseSalary = Number(profile.base_salary || 0);
-      user.transportAllowance = Number(profile.transport_allowance || 0);
-      user.otherAllowance = Number(profile.other_allowance || 0);
-      user.bpjsKetenagakerjaan = Number(profile.bpjs_ketenagakerjaan || 0);
-      user.bpjsKesehatan = Number(profile.bpjs_kesehatan || 0);
-      user.workStartTime = profile.work_start_time || undefined;
-      user.workEndTime = profile.work_end_time || undefined;
-    }
-    return user;
-  });
+  // email not saved on profiles for privacy, or fetched via auth later
+  return data.map((profile: any) => mapProfileToUser(profile, ""));
 }
 
 export async function getSchedules() {

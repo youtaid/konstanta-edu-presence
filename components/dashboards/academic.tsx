@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CheckCircle, FileText, XCircle, Pencil, Trash2 } from "lucide-react";
+import TeacherDataTab from "@/components/dashboards/teacher-data-tab";
 
 export default function AcademicDashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -29,11 +30,12 @@ export default function AcademicDashboard() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<"jadwal" | "siswa">(
+  const [activeTab, setActiveTab] = useState<"jadwal" | "siswa" | "guru">(
     "jadwal",
   );
 
   const [isCreating, setIsCreating] = useState(false);
+  const [teacherFilter, setTeacherFilter] = useState("");
   const [newSchedule, setNewSchedule] = useState({
     date: new Date().toISOString().split("T")[0],
     startTime: "14:00",
@@ -127,6 +129,12 @@ export default function AcademicDashboard() {
           >
             Data Siswa
           </button>
+          <button
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "guru" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+            onClick={() => setActiveTab("guru")}
+          >
+            Data Guru
+          </button>
         </div>
       </div>
 
@@ -151,6 +159,13 @@ export default function AcademicDashboard() {
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Guru</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded-md p-2 text-sm bg-white mb-1"
+                    placeholder="Cari nama guru..."
+                    value={teacherFilter}
+                    onChange={(e) => setTeacherFilter(e.target.value)}
+                  />
                   <select
                     className="w-full border rounded-md p-2 text-sm bg-white"
                     value={newSchedule.teacherId}
@@ -165,11 +180,15 @@ export default function AcademicDashboard() {
                       });
                     }}
                   >
-                    {teachers.map((t) => (
-                      <option key={t.teacherId} value={t.teacherId}>
-                        {t.name}
-                      </option>
-                    ))}
+                    {teachers
+                      .filter((t) =>
+                        t.name.toLowerCase().includes(teacherFilter.toLowerCase()),
+                      )
+                      .map((t) => (
+                        <option key={t.teacherId} value={t.teacherId}>
+                          {t.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>
@@ -285,45 +304,95 @@ export default function AcademicDashboard() {
                   newSchedule.program === "Privat") && (
                   <div className="md:col-span-2 border-t pt-3 mt-1">
                     <label className="text-sm font-medium mb-2 block text-teal-700">
-                      Pilih Siswa (Khusus ELC / Privat)
+                      Pilih Siswa (Khusus ELC / Privat) — bisa manual per
+                      siswa atau sekaligus per kelas
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {students
-                        .filter((s) => s.program === newSchedule.program)
-                        .map((s) => (
-                          <label
-                            key={s.id}
-                            className="flex items-center space-x-2 bg-white p-2 rounded border border-gray-200 cursor-pointer hover:bg-teal-50"
-                          >
-                            <input
-                              type="checkbox"
-                              className="rounded text-teal-600 focus:ring-teal-500 h-4 w-4"
-                              checked={newSchedule.studentIds.includes(s.id)}
-                              onChange={(e) => {
-                                let newIds = [...newSchedule.studentIds];
-                                let newStudents = [...newSchedule.students];
-                                if (e.target.checked) {
-                                  newIds.push(s.id);
-                                  newStudents.push({ id: s.id, name: s.name });
-                                } else {
-                                  newIds = newIds.filter((id) => id !== s.id);
-                                  newStudents = newStudents.filter(
-                                    (st) => st.id !== s.id,
-                                  );
-                                }
-                                setNewSchedule({
-                                  ...newSchedule,
-                                  studentIds: newIds,
-                                  students: newStudents,
-                                });
-                              }}
-                            />
-                            <span className="text-sm text-gray-700">
-                              {s.name}
-                            </span>
-                          </label>
-                        ))}
-                    </div>
+                    {(() => {
+                      const programStudents = students.filter(
+                        (s) => s.program === newSchedule.program,
+                      );
+                      const groups = new Map<string, Student[]>();
+                      programStudents.forEach((s) => {
+                        const key = s.className || "Belum Ada Kelas";
+                        if (!groups.has(key)) groups.set(key, []);
+                        groups.get(key)!.push(s);
+                      });
+
+                      const toggleStudent = (s: Student, checked: boolean) => {
+                        let newIds = [...newSchedule.studentIds];
+                        let newStudents = [...newSchedule.students];
+                        if (checked) {
+                          if (!newIds.includes(s.id)) {
+                            newIds.push(s.id);
+                            newStudents.push({ id: s.id, name: s.name });
+                          }
+                        } else {
+                          newIds = newIds.filter((id) => id !== s.id);
+                          newStudents = newStudents.filter((st) => st.id !== s.id);
+                        }
+                        setNewSchedule({ ...newSchedule, studentIds: newIds, students: newStudents });
+                      };
+
+                      const toggleClass = (classStudents: Student[], checked: boolean) => {
+                        let newIds = [...newSchedule.studentIds];
+                        let newStudents = [...newSchedule.students];
+                        classStudents.forEach((s) => {
+                          if (checked) {
+                            if (!newIds.includes(s.id)) {
+                              newIds.push(s.id);
+                              newStudents.push({ id: s.id, name: s.name });
+                            }
+                          } else {
+                            newIds = newIds.filter((id) => id !== s.id);
+                            newStudents = newStudents.filter((st) => st.id !== s.id);
+                          }
+                        });
+                        setNewSchedule({ ...newSchedule, studentIds: newIds, students: newStudents });
+                      };
+
+                      return (
+                        <div className="space-y-3">
+                          {Array.from(groups.entries()).map(([className, classStudents]) => {
+                            const selectedCount = classStudents.filter((s) =>
+                              newSchedule.studentIds.includes(s.id),
+                            ).length;
+                            const allSelected = selectedCount === classStudents.length;
+
+                            return (
+                              <div key={className} className="bg-white border border-gray-200 rounded-md p-2">
+                                <label className="flex items-center space-x-2 cursor-pointer mb-2 pb-2 border-b border-gray-100">
+                                  <input
+                                    type="checkbox"
+                                    className="rounded text-teal-600 focus:ring-teal-500 h-4 w-4"
+                                    checked={allSelected}
+                                    onChange={(e) => toggleClass(classStudents, e.target.checked)}
+                                  />
+                                  <span className="text-sm font-semibold text-teal-700">
+                                    Kelas: {className} ({selectedCount}/{classStudents.length} dipilih)
+                                  </span>
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                  {classStudents.map((s) => (
+                                    <label
+                                      key={s.id}
+                                      className="flex items-center space-x-2 p-1 rounded cursor-pointer hover:bg-teal-50"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="rounded text-teal-600 focus:ring-teal-500 h-4 w-4"
+                                        checked={newSchedule.studentIds.includes(s.id)}
+                                        onChange={(e) => toggleStudent(s, e.target.checked)}
+                                      />
+                                      <span className="text-sm text-gray-700">{s.name}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
                 <div className="md:col-span-2">
@@ -523,6 +592,10 @@ export default function AcademicDashboard() {
           programs={programs}
           onStudentCreated={loadData}
         />
+      )}
+
+      {activeTab === "guru" && (
+        <TeacherDataTab teachers={teachers} onTeacherUpdated={loadData} />
       )}
     </div>
   );
