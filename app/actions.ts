@@ -78,6 +78,7 @@ export async function getSchedules() {
     status: s.status as ScheduleStatus,
     honorAmount: Number(s.honor_amount || 0),
     honorType: (s.honor_type || "FULL") as Schedule["honorType"],
+    classMode: (s.class_mode || "OFFLINE") as Schedule["classMode"],
     report: s.report || undefined,
     checkIn: s.check_in || undefined,
     checkOut: s.check_out || undefined,
@@ -373,11 +374,14 @@ export async function updateScheduleStatus(id: string, status: ScheduleStatus) {
   revalidatePath("/");
 }
 
-export async function updateScheduleHonor(id: string, honorAmount: number) {
+export async function updateScheduleHonor(id: string, honorAmount: number, honorType?: Schedule["honorType"]) {
   const supabase = await getSupabase();
+  const updateData: Record<string, unknown> = { honor_amount: honorAmount };
+  if (honorType) updateData.honor_type = honorType;
+
   await supabase
     .from("schedules")
-    .update({ honor_amount: honorAmount })
+    .update(updateData)
     .eq("id", id);
   revalidatePath("/");
 }
@@ -443,7 +447,8 @@ export async function createSchedule(data: Omit<Schedule, "id" | "status">) {
       branch: data.branch,
       status: "WAITING_APPROVAL",
       honor_amount: data.honorAmount,
-      honor_type: data.honorType || "FULL"
+      honor_type: data.honorType || "FULL",
+      class_mode: data.classMode || "OFFLINE"
     });
   revalidatePath("/");
 }

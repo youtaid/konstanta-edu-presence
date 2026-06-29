@@ -55,6 +55,7 @@ const initialSchedules: Schedule[] = [
     status: 'WAITING_APPROVAL',
     honorAmount: 150000,
     honorType: 'FULL',
+    classMode: 'OFFLINE',
   },
   {
     id: 'S2',
@@ -70,6 +71,7 @@ const initialSchedules: Schedule[] = [
     status: 'VALIDATED',
     honorAmount: 150000,
     honorType: 'FULL',
+    classMode: 'OFFLINE',
     checkIn: { time: '15:55', lat: -6.2301, lng: 106.8501 },
     checkOut: { time: '17:35', lat: -6.2301, lng: 106.8501 },
     report: {
@@ -96,6 +98,7 @@ const initialSchedules: Schedule[] = [
     status: 'PAID',
     honorAmount: 125000,
     honorType: 'FULL',
+    classMode: 'OFFLINE',
     checkIn: { time: '08:50', lat: -6.38, lng: 106.83 },
     checkOut: { time: '10:35', lat: -6.38, lng: 106.83 },
     report: {

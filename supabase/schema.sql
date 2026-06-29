@@ -91,6 +91,8 @@ CREATE TABLE IF NOT EXISTS public.schedules (
   -- outside work hours, 50% honor. Always FULL for KangGuru (freelance), whose
   -- entire pay comes from honor_amount regardless of this field.
   honor_type TEXT NOT NULL DEFAULT 'FULL' CHECK (honor_type IN ('WAJIB', 'FULL', 'HALF')),
+  -- Set by Akademik when scheduling; used by Admin to default KangGuru honor.
+  class_mode TEXT NOT NULL DEFAULT 'OFFLINE' CHECK (class_mode IN ('ONLINE', 'OFFLINE')),
   report JSONB, -- lesson report details
   check_in JSONB, -- check in coordinate & time
   check_out JSONB, -- check out coordinate & time
@@ -98,6 +100,7 @@ CREATE TABLE IF NOT EXISTS public.schedules (
 );
 
 ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS honor_type TEXT NOT NULL DEFAULT 'FULL' CHECK (honor_type IN ('WAJIB', 'FULL', 'HALF'));
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS class_mode TEXT NOT NULL DEFAULT 'OFFLINE' CHECK (class_mode IN ('ONLINE', 'OFFLINE'));
 
 ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
 

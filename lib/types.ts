@@ -7,6 +7,10 @@ export type TeacherType = 'TETAP' | 'FREELANCE';
 // honor. KangGuru (freelance) selalu diperlakukan sebagai FULL.
 export type HonorType = 'WAJIB' | 'FULL' | 'HALF';
 
+// Diatur oleh Akademik saat membuat jadwal; dipakai Admin untuk menentukan
+// default nominal honor KangGuru per program.
+export type ClassMode = 'ONLINE' | 'OFFLINE';
+
 export type User = {
   id: string;
   name: string;
@@ -67,6 +71,7 @@ export type Schedule = {
   status: ScheduleStatus;
   honorAmount: number;
   honorType: HonorType;
+  classMode: ClassMode;
   report?: {
     materialTaught: string;
     understandingLevel: string;
