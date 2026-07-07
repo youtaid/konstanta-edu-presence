@@ -9,3 +9,5 @@ coverage/
 .codex-pnpm-home/
 pnpm-lock.yaml
 pnpm-workspace.yaml
+
+/generated/prisma
