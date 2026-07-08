@@ -516,9 +516,7 @@ export default function TeacherDashboard() {
                   <option>Pasif</option>
                 </select>
               </div>
-              {(selectedSchedule.program === "ELC" ||
-                selectedSchedule.program === "Privat") &&
-                reportForm.studentProgresses.length > 0 && (
+              {reportForm.studentProgresses.length > 0 && (
                   <div className="border-t pt-4 mt-2">
                     <h4 className="text-sm font-semibold mb-3 text-teal-800">
                       Laporan Progress Siswa

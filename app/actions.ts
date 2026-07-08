@@ -3,7 +3,7 @@
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookies } from "next/headers";
-import { Schedule, ScheduleStatus, User, Student, Period } from "@/lib/types";
+import { Schedule, ScheduleStatus, User, Student, Period, StudentSessionReport } from "@/lib/types";
 import { mapProfileToUser } from "@/lib/profile-mapper";
 import { revalidatePath } from "next/cache";
 
@@ -56,6 +56,7 @@ export async function getSchedules() {
     honorAmount: Number(s.honor_amount || 0),
     honorType: (s.honor_type || "FULL") as Schedule["honorType"],
     classMode: (s.class_mode || "OFFLINE") as Schedule["classMode"],
+    archived: s.archived || false,
     report: s.report || undefined,
     checkIn: s.check_in || undefined,
     checkOut: s.check_out || undefined,
@@ -130,6 +131,36 @@ export async function getStudents() {
     name: s.name,
     program: s.program,
     className: s.class_name || undefined,
+  }));
+}
+
+export async function getStudentSessionReports(
+  studentId: string,
+): Promise<StudentSessionReport[]> {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from("student_session_reports")
+    .select("*")
+    .eq("student_id", studentId)
+    .order("session_date", { ascending: false });
+
+  if (!data) return [];
+
+  return data.map((r: any) => ({
+    id: r.id,
+    scheduleId: r.schedule_id,
+    studentId: r.student_id,
+    studentName: r.student_name,
+    program: r.program,
+    className: r.class_name || undefined,
+    subject: r.subject,
+    topic: r.topic || undefined,
+    teacherId: r.teacher_id,
+    teacherName: r.teacher_name,
+    sessionDate: r.session_date,
+    attendance: r.attendance,
+    progressNote: r.progress_note || "",
+    createdAt: r.created_at,
   }));
 }
 
@@ -342,6 +373,16 @@ export async function payTeacherSchedules(
   revalidatePath("/");
 }
 
+export async function setSchedulesArchived(ids: string[], archived: boolean) {
+  if (ids.length === 0) return;
+  const supabase = await getSupabase();
+  await supabase
+    .from("schedules")
+    .update({ archived })
+    .in("id", ids);
+  revalidatePath("/");
+}
+
 export async function updateScheduleStatus(id: string, status: ScheduleStatus) {
   const supabase = await getSupabase();
   await supabase
@@ -392,18 +433,53 @@ export async function checkOutAndReport(
     minute: "2-digit",
   });
 
-  await supabase
+  const { data: updated } = await supabase
     .from("schedules")
     .update({
       status: "WAITING_VERIFICATION",
       check_out: { time, lat, lng },
       report
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select()
+    .single();
+
+  // Derived write-through index for per-student attendance/progress history.
+  // Per-row upserts so one bad `attendance` value (CHECK constraint) can't
+  // fail the whole batch; failures here don't block the teacher's checkout.
+  if (updated && report.studentProgresses?.length) {
+    await Promise.all(
+      report.studentProgresses.map((sp) =>
+        supabase
+          .from("student_session_reports")
+          .upsert(
+            {
+              id: `${id}_${sp.studentId}`,
+              schedule_id: id,
+              student_id: sp.studentId,
+              student_name: sp.studentName,
+              program: updated.program,
+              subject: updated.subject,
+              topic: updated.topic,
+              teacher_id: updated.teacher_id,
+              teacher_name: updated.teacher_name,
+              session_date: updated.date,
+              attendance: sp.attendance,
+              progress_note: sp.progress,
+            },
+            { onConflict: "id" },
+          )
+          .then(({ error }) => {
+            if (error) console.error("student_session_reports upsert failed", error);
+          }),
+      ),
+    );
+  }
+
   revalidatePath("/");
 }
 
-export async function createSchedule(data: Omit<Schedule, "id" | "status">) {
+export async function createSchedule(data: Omit<Schedule, "id" | "status" | "archived">) {
   const supabase = await getSupabase();
   const id = `S${Date.now()}`;
 

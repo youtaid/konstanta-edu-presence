@@ -43,6 +43,39 @@ export type Student = {
   className?: string;
 };
 
+export type AttendanceStatus = 'Hadir' | 'Izin' | 'Sakit' | 'Alpa';
+
+// One row per (schedule, student) session report, derived from
+// Schedule["report"]["studentProgresses"] when a teacher checks out. Powers
+// per-student attendance/progress history & percentage in the Academic
+// dashboard's "Data Siswa" tab.
+export type StudentSessionReport = {
+  id: string;
+  scheduleId: string;
+  studentId: string;
+  studentName: string;
+  program: string;
+  className?: string;
+  subject: string;
+  topic?: string;
+  teacherId: string;
+  teacherName: string;
+  sessionDate: string;
+  attendance: AttendanceStatus;
+  progressNote: string;
+  createdAt: string;
+};
+
+export type StudentAttendanceSummary = {
+  studentId: string;
+  totalSessions: number;
+  hadirCount: number;
+  izinCount: number;
+  sakitCount: number;
+  alpaCount: number;
+  attendancePercentage: number;
+};
+
 export type ScheduleStatus =
   | 'DRAFT'
   | 'WAITING_APPROVAL'
@@ -72,6 +105,7 @@ export type Schedule = {
   honorAmount: number;
   honorType: HonorType;
   classMode: ClassMode;
+  archived: boolean;
   report?: {
     materialTaught: string;
     understandingLevel: string;

@@ -56,6 +56,7 @@ const initialSchedules: Schedule[] = [
     honorAmount: 150000,
     honorType: 'FULL',
     classMode: 'OFFLINE',
+    archived: false,
   },
   {
     id: 'S2',
@@ -72,6 +73,7 @@ const initialSchedules: Schedule[] = [
     honorAmount: 150000,
     honorType: 'FULL',
     classMode: 'OFFLINE',
+    archived: false,
     checkIn: { time: '15:55', lat: -6.2301, lng: 106.8501 },
     checkOut: { time: '17:35', lat: -6.2301, lng: 106.8501 },
     report: {
@@ -99,6 +101,7 @@ const initialSchedules: Schedule[] = [
     honorAmount: 125000,
     honorType: 'FULL',
     classMode: 'OFFLINE',
+    archived: false,
     checkIn: { time: '08:50', lat: -6.38, lng: 106.83 },
     checkOut: { time: '10:35', lat: -6.38, lng: 106.83 },
     report: {

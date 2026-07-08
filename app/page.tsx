@@ -136,6 +136,11 @@ export default function Home() {
 
         <div className="w-full max-w-md relative z-10 card-3d p-8 bg-white/80 backdrop-blur-md rounded-3xl shadow-xl border border-white">
           <div className="text-center pb-6">
+            <img
+              src="/logo-konstanta-education.png"
+              alt="Konstanta Education"
+              className="h-12 w-auto mx-auto mb-4"
+            />
             <div className="flex items-center justify-center gap-1 bg-teal-50 text-teal-800 rounded-full px-3 py-1 text-xs font-semibold w-fit mx-auto border border-teal-100 shadow-sm mb-3">
               <Sparkles className="w-3.5 h-3.5 text-teal-600" />
               <span>Sistem Presensi</span>
@@ -249,9 +254,11 @@ export default function Home() {
 
       <header className="bg-glass sticky top-0 z-50 px-6 py-4 flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-xl shadow-[0_4px_10px_rgba(13,148,136,0.3)] flex items-center justify-center text-white font-bold text-xl border border-white/20">
-            KE
-          </div>
+          <img
+            src="/logo-icon.png"
+            alt="Konstanta Education"
+            className="w-10 h-10 rounded-xl shadow-[0_4px_10px_rgba(13,148,136,0.3)] border border-white/20"
+          />
           <div>
             <h1 className="text-lg font-extrabold text-gray-800 leading-tight">
               KE Presensi

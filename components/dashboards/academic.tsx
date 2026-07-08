@@ -4,13 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import {
   getSchedules,
   updateScheduleStatus,
+  setSchedulesArchived,
   createSchedule,
   getUsers,
   getPrograms,
   getStudents,
+  getStudentSessionReports,
 } from "@/app/actions";
-import { Schedule, User, Student, HonorType, ClassMode } from "@/lib/types";
+import { Schedule, User, Student, HonorType, ClassMode, StudentSessionReport } from "@/lib/types";
 import { isWithinWorkHours, getDefaultKangGuruHonor } from "@/lib/honor";
+import { computeAttendanceSummary } from "@/lib/attendance";
 import {
   Card,
   CardContent,
@@ -20,7 +23,37 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CheckCircle, FileText, XCircle, Pencil, Trash2 } from "lucide-react";
+import { Plus, CheckCircle, FileText, XCircle, Pencil, Trash2, Archive, ArchiveRestore, History, X, Download } from "lucide-react";
+
+type TimeFilter = "all" | "today" | "week" | "month" | "custom";
+
+function isWithinTimeFilter(
+  dateStr: string,
+  filter: TimeFilter,
+  customStart: string,
+  customEnd: string,
+): boolean {
+  if (filter === "all") return true;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  if (filter === "today") return dateStr === todayStr;
+
+  if (filter === "week") {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    return dateStr >= weekAgo.toISOString().split("T")[0] && dateStr <= todayStr;
+  }
+
+  if (filter === "month") {
+    return dateStr.slice(0, 7) === todayStr.slice(0, 7);
+  }
+
+  // custom
+  if (customStart && dateStr < customStart) return false;
+  if (customEnd && dateStr > customEnd) return false;
+  return true;
+}
 import TeacherDataTab from "@/components/dashboards/teacher-data-tab";
 
 export default function AcademicDashboard() {
@@ -36,6 +69,14 @@ export default function AcademicDashboard() {
 
   const [isCreating, setIsCreating] = useState(false);
   const [teacherFilter, setTeacherFilter] = useState("");
+
+  // "Semua Jadwal" table controls: bulk selection, archive view toggle, time filter.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [isArchiving, setIsArchiving] = useState(false);
   const [newSchedule, setNewSchedule] = useState({
     date: new Date().toISOString().split("T")[0],
     startTime: "14:00",
@@ -99,6 +140,40 @@ export default function AcademicDashboard() {
   const handleVerify = async (id: string, approve: boolean) => {
     await updateScheduleStatus(id, approve ? "WAITING_VALIDATION" : "REJECTED");
     loadData();
+  };
+
+  const visibleSchedules = schedules
+    .filter((s) => (showArchived ? s.archived : !s.archived))
+    .filter((s) => isWithinTimeFilter(s.date, timeFilter, customStart, customEnd));
+
+  const allVisibleSelected =
+    visibleSchedules.length > 0 && visibleSchedules.every((s) => selectedIds.has(s.id));
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(visibleSchedules.map((s) => s.id)) : new Set());
+  };
+
+  const toggleSelectRow = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const switchArchiveView = (archived: boolean) => {
+    setShowArchived(archived);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkArchive = async (archived: boolean) => {
+    if (selectedIds.size === 0) return;
+    setIsArchiving(true);
+    await setSchedulesArchived(Array.from(selectedIds), archived);
+    setSelectedIds(new Set());
+    await loadData();
+    setIsArchiving(false);
   };
 
   if (loading) return <div className="p-4">Memuat data akademik...</div>;
@@ -533,14 +608,92 @@ export default function AcademicDashboard() {
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold mb-4 border-b pb-2">
-              Semua Jadwal
-            </h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 mb-4 border-b pb-2">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold">Semua Jadwal</h3>
+                <div className="flex bg-gray-100/50 p-1 rounded-lg border border-gray-200">
+                  <button
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${!showArchived ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+                    onClick={() => switchArchiveView(false)}
+                  >
+                    Aktif ({schedules.filter((s) => !s.archived).length})
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${showArchived ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+                    onClick={() => switchArchiveView(true)}
+                  >
+                    <Archive className="w-3 h-3" /> Arsip ({schedules.filter((s) => s.archived).length})
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="border rounded-md p-1.5 text-xs bg-white"
+                  value={timeFilter}
+                  onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                >
+                  <option value="all">Semua Waktu</option>
+                  <option value="today">Hari Ini</option>
+                  <option value="week">7 Hari Terakhir</option>
+                  <option value="month">Bulan Ini</option>
+                  <option value="custom">Rentang Kustom...</option>
+                </select>
+                {timeFilter === "custom" && (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="date"
+                      className="border rounded-md p-1.5 text-xs bg-white"
+                      value={customStart}
+                      onChange={(e) => setCustomStart(e.target.value)}
+                    />
+                    <span className="text-xs text-gray-400">-</span>
+                    <input
+                      type="date"
+                      className="border rounded-md p-1.5 text-xs bg-white"
+                      value={customEnd}
+                      onChange={(e) => setCustomEnd(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5 mb-3">
+                <span className="text-sm font-medium text-teal-800">
+                  {selectedIds.size} jadwal dipilih
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
+                    Batal
+                  </Button>
+                  {showArchived ? (
+                    <Button size="sm" disabled={isArchiving} onClick={() => handleBulkArchive(false)}>
+                      <ArchiveRestore className="w-3.5 h-3.5 mr-1.5" /> Pulihkan
+                    </Button>
+                  ) : (
+                    <Button size="sm" disabled={isArchiving} onClick={() => handleBulkArchive(true)}>
+                      <Archive className="w-3.5 h-3.5 mr-1.5" /> Arsipkan
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-100 text-gray-700">
                     <tr>
+                      <th className="px-4 py-3 font-medium w-10">
+                        <input
+                          type="checkbox"
+                          className="rounded text-teal-600 focus:ring-teal-500 h-4 w-4"
+                          checked={allVisibleSelected}
+                          onChange={(e) => toggleSelectAll(e.target.checked)}
+                        />
+                      </th>
                       <th className="px-4 py-3 font-medium">ID</th>
                       <th className="px-4 py-3 font-medium">Tanggal</th>
                       <th className="px-4 py-3 font-medium">Guru</th>
@@ -550,8 +703,16 @@ export default function AcademicDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {schedules.map((s) => (
-                      <tr key={s.id} className="hover:bg-gray-50">
+                    {visibleSchedules.map((s) => (
+                      <tr key={s.id} className={`hover:bg-gray-50 ${selectedIds.has(s.id) ? "bg-teal-50/50" : ""}`}>
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            className="rounded text-teal-600 focus:ring-teal-500 h-4 w-4"
+                            checked={selectedIds.has(s.id)}
+                            onChange={(e) => toggleSelectRow(s.id, e.target.checked)}
+                          />
+                        </td>
                         <td className="px-4 py-3 font-medium text-gray-900">
                           {s.id}
                         </td>
@@ -578,6 +739,15 @@ export default function AcademicDashboard() {
                         </td>
                       </tr>
                     ))}
+                    {visibleSchedules.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 italic">
+                          {showArchived
+                            ? "Belum ada jadwal yang diarsipkan."
+                            : "Tidak ada jadwal untuk filter waktu ini."}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -641,6 +811,7 @@ function StudentDataTab({
   const defaultGrade = GRADE_LEVELS[GRADE_LEVELS.length - 1];
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     program: programs[0] || "ELC",
@@ -713,7 +884,19 @@ function StudentDataTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <a href="/api/students/report-all?format=pdf" download>
+              <Download className="w-3.5 h-3.5 mr-1.5" /> Unduh Semua (PDF)
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href="/api/students/report-all?format=docx" download>
+              <Download className="w-3.5 h-3.5 mr-1.5" /> Unduh Semua (DOCX)
+            </a>
+          </Button>
+        </div>
         <Button
           onClick={() => {
             resetForm();
@@ -880,6 +1063,14 @@ function StudentDataTab({
                             variant="outline"
                             size="sm"
                             className="flex-1"
+                            onClick={() => setHistoryStudent(student)}
+                          >
+                            <History className="w-3.5 h-3.5 mr-1" /> Riwayat
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
                             onClick={() => handleEdit(student)}
                           >
                             <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
@@ -902,6 +1093,150 @@ function StudentDataTab({
           </div>
         );
       })}
+
+      {historyStudent && (
+        <StudentHistoryModal
+          student={historyStudent}
+          onClose={() => setHistoryStudent(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function attendanceBadgeVariant(attendance: string) {
+  if (attendance === "Hadir") return "success" as const;
+  if (attendance === "Alpa") return "destructive" as const;
+  return "outline" as const;
+}
+
+function StudentHistoryModal({
+  student,
+  onClose,
+}: {
+  student: Student;
+  onClose: () => void;
+}) {
+  const [reports, setReports] = useState<StudentSessionReport[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getStudentSessionReports(student.id).then((data) => {
+      if (!cancelled) {
+        setReports(data);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [student.id]);
+
+  const summary = computeAttendanceSummary(student.id, reports);
+  const percentVariant =
+    summary.attendancePercentage >= 80
+      ? ("success" as const)
+      : summary.attendancePercentage >= 60
+        ? ("warning" as const)
+        : ("destructive" as const);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <CardHeader className="shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle>{student.name}</CardTitle>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline">{student.program}</Badge>
+                {student.className && (
+                  <Badge variant="secondary">{student.className}</Badge>
+                )}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={onClose}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 overflow-y-auto shrink min-h-0">
+          {loading ? (
+            <p className="text-sm text-gray-500 italic py-4">Memuat riwayat...</p>
+          ) : (
+            <>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-gray-500 block">
+                    Persentase Kehadiran ({summary.totalSessions} sesi)
+                  </span>
+                  <span className="text-2xl font-bold text-gray-900">
+                    {summary.attendancePercentage}%
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <Badge variant={percentVariant}>
+                    {summary.attendancePercentage >= 80
+                      ? "Baik"
+                      : summary.attendancePercentage >= 60
+                        ? "Perlu Diperhatikan"
+                        : "Rendah"}
+                  </Badge>
+                  <Badge variant="success">Hadir {summary.hadirCount}</Badge>
+                  <Badge variant="outline">Izin {summary.izinCount}</Badge>
+                  <Badge variant="outline">Sakit {summary.sakitCount}</Badge>
+                  <Badge variant="destructive">Alpa {summary.alpaCount}</Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {reports.map((r) => (
+                  <div
+                    key={r.id}
+                    className="p-3 bg-white border border-gray-200 rounded-lg text-sm"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-medium text-gray-900">
+                        {r.sessionDate} — {r.subject}
+                      </span>
+                      <Badge
+                        variant={attendanceBadgeVariant(r.attendance)}
+                        className="text-[10px] px-1.5 py-0 h-5"
+                      >
+                        {r.attendance}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-1">
+                      Guru: {r.teacherName}
+                    </p>
+                    <p className="text-gray-700">
+                      {r.progressNote || "Tidak ada catatan"}
+                    </p>
+                  </div>
+                ))}
+                {reports.length === 0 && (
+                  <p className="text-sm text-gray-500 italic py-4 text-center">
+                    Belum ada riwayat kehadiran/perkembangan untuk siswa ini.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-end gap-2 border-t pt-4 shrink-0">
+          <Button variant="outline" asChild>
+            <a href={`/api/students/${student.id}/report?format=pdf`} download>
+              <Download className="w-4 h-4 mr-2" /> Unduh PDF
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={`/api/students/${student.id}/report?format=docx`} download>
+              <Download className="w-4 h-4 mr-2" /> Unduh DOCX
+            </a>
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

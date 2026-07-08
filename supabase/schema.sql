@@ -101,6 +101,10 @@ CREATE TABLE IF NOT EXISTS public.schedules (
 
 ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS honor_type TEXT NOT NULL DEFAULT 'FULL' CHECK (honor_type IN ('WAJIB', 'FULL', 'HALF'));
 ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS class_mode TEXT NOT NULL DEFAULT 'OFFLINE' CHECK (class_mode IN ('ONLINE', 'OFFLINE'));
+-- Lets Akademik archive old/irrelevant jadwal out of the "Semua Jadwal" view
+-- without deleting them (still needed for payroll/reporting history).
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_schedules_archived ON public.schedules(archived);
 
 ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
 
@@ -112,6 +116,33 @@ CREATE TABLE IF NOT EXISTS public.settings (
 );
 
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+
+-- 7. STUDENT_SESSION_REPORTS Table
+-- Write-through derived index of schedules.report.studentProgresses[], one row
+-- per (schedule_id, student_id), populated by checkOutAndReport. Lets us query
+-- a student's attendance/progress history and attendance % without scanning
+-- every schedule's report JSONB.
+CREATE TABLE IF NOT EXISTS public.student_session_reports (
+  id TEXT PRIMARY KEY, -- deterministic: `${schedule_id}_${student_id}`, doubles as upsert idempotency key
+  schedule_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  student_name TEXT NOT NULL,
+  program TEXT NOT NULL,
+  class_name TEXT,
+  subject TEXT NOT NULL,
+  topic TEXT,
+  teacher_id TEXT NOT NULL,
+  teacher_name TEXT NOT NULL,
+  session_date DATE NOT NULL,
+  attendance TEXT NOT NULL DEFAULT 'Hadir' CHECK (attendance IN ('Hadir', 'Izin', 'Sakit', 'Alpa')),
+  progress_note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ssr_student_date ON public.student_session_reports(student_id, session_date DESC);
+CREATE INDEX IF NOT EXISTS idx_ssr_schedule_id ON public.student_session_reports(schedule_id);
+
+ALTER TABLE public.student_session_reports ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- Row Level Security (RLS) Policies
@@ -167,3 +198,6 @@ CREATE POLICY "Programs are manageable by staff" ON public.programs FOR ALL USIN
 
 DROP POLICY IF EXISTS "Schedules are manageable by staff" ON public.schedules;
 CREATE POLICY "Schedules are manageable by staff" ON public.schedules FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Student session reports are manageable by staff" ON public.student_session_reports;
+CREATE POLICY "Student session reports are manageable by staff" ON public.student_session_reports FOR ALL USING (true) WITH CHECK (true);
