@@ -84,8 +84,8 @@ export default function AcademicDashboard() {
     program: "ELC",
     subject: "Matematika",
     topic: "",
-    teacherId: "T1",
-    teacherName: "Budi Santoso",
+    teacherId: "",
+    teacherName: "",
     studentIds: [] as string[],
     students: [] as { id: string; name: string }[],
     branch: "Tebet",
@@ -102,9 +102,25 @@ export default function AcademicDashboard() {
         getStudents(),
       ]);
     setSchedules(allSchedules);
-    setTeachers(allUsers.filter((u) => u.role === "TEACHER"));
+    const activeTeachers = allUsers.filter((u) => u.role === "TEACHER");
+    setTeachers(activeTeachers);
     setPrograms(allPrograms);
     setStudents(allStudents);
+
+    // Set default selected teacher dynamically to the first available teacher from database
+    if (activeTeachers.length > 0) {
+      setNewSchedule((prev) => {
+        if (prev.teacherId === "") {
+          return {
+            ...prev,
+            teacherId: activeTeachers[0].teacherId || "",
+            teacherName: activeTeachers[0].name,
+          };
+        }
+        return prev;
+      });
+    }
+
     setLoading(false);
   }, []);
 
