@@ -112,6 +112,24 @@ export default function AcademicDashboard() {
     loadData();
   }, [loadData]);
 
+  // Synchronize teacher selection with the filter input (prevents default values like Budi Santoso when option is filtered out)
+  useEffect(() => {
+    if (teachers.length === 0) return;
+    const filtered = teachers.filter((t) =>
+      t.name.toLowerCase().includes(teacherFilter.toLowerCase())
+    );
+    if (filtered.length > 0) {
+      const exists = filtered.some((t) => t.teacherId === newSchedule.teacherId);
+      if (!exists) {
+        setNewSchedule((prev) => ({
+          ...prev,
+          teacherId: filtered[0].teacherId || "",
+          teacherName: filtered[0].name,
+        }));
+      }
+    }
+  }, [teacherFilter, teachers, newSchedule.teacherId]);
+
   // Akademik only sets the KBM details + class mode. Jam kerja, jenis honor
   // (Wajib/100%/50%), and nominal honor are Admin's call — this is just an
   // automatic starting estimate that Admin reviews/adjusts during validasi.
