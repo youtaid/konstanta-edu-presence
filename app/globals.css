@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
 @layer utilities {
   .bg-glass {
     @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
@@ -17,6 +21,15 @@
   .card-3d {
     @apply bg-white rounded-2xl border-2 border-gray-100 shadow-[0_8px_0_0_#e5e7eb] transition-all hover:translate-y-[-2px] hover:shadow-[0_12px_0_0_#e5e7eb];
   }
+  .text-3d-brand {
+    color: #14b8a6;
+    text-shadow:
+      1px 1px 0 #0f766e,
+      2px 2px 0 #0f766e,
+      3px 3px 0 #115e59,
+      4px 4px 0 #115e59,
+      5px 5px 10px rgba(13, 148, 136, 0.35);
+  }
   .animate-blob {
     animation: blob 7s infinite;
   }
@@ -25,6 +38,9 @@
   }
   .animation-delay-4000 {
     animation-delay: 4s;
+  }
+  .animate-diamond-rotate {
+    animation: diamond-rotate 3s linear infinite;
   }
 }
 
@@ -40,6 +56,15 @@
   }
   100% {
     transform: translate(0px, 0px) scale(1);
+  }
+}
+
+@keyframes diamond-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 

@@ -12,20 +12,25 @@
 | Akademik | Demo Akademik | `demo.akademik@konstanta.my.id` | `AkademikDemo123!` |
 | KETetap | Demo KETetap | `demo.ketetap@konstanta.my.id` | `KetetapDemo123!` |
 | KangGuru | Demo KangGuru | `demo.kangguru@konstanta.my.id` | `KangguruDemo123!` |
+| Eval | Demo Eval | `demo.eval@konstanta.my.id` | `EvalDemo123!` |
 | Karyawan | Demo Karyawan | `demo.karyawan@konstanta.my.id` | `KaryawanDemo123!` |
+| OTK (Orang Tua) | Demo Orang Tua | `demo.otk@konstanta.my.id` | `OtkDemo123!` |
+| KEnz (Siswa) | Demo Siswa | `demo.kenz@konstanta.my.id` | `KenzDemo123!` |
+
+> **Catatan OTK/KEnz**: `Demo Orang Tua` terhubung ke 2 anak demo (Ahmad — ST1, Siti — ST2) untuk menguji selector multi-anak; `Demo Siswa` adalah akun Ahmad (ST1) sendiri. Riwayat kehadiran/nilai untuk kedua akun ini dibuat oleh `supabase/seed_lms.sql` — jalankan file itu setelah `seed_staff.sql` agar datanya muncul.
 
 ## Akun Staff Otomatis (Wajib Reset Password pada Login Pertama)
 
 | Nama Staf | Email Login | Peran (Roles) | Password Awal |
 |---|---|---|---|
 | Anisa Zunayah | `anisa.zunayah@konstanta.my.id` | Admin, KETetap | `Konstanta6716` |
-| Farid Fachrudin | `farid.fachrudin@konstanta.my.id` | Admin, Akademik, KETetap | `Konstanta1386` |
+| Farid Fachrudin | `farid.fachrudin@konstanta.my.id` | Admin, Akademik, KETetap, Eval | `Konstanta1386` |
 | Farhanul Karim | `farhanul.karim@konstanta.my.id` | Admin, KETetap | `Konstanta9928` |
 | Budi Rahman | `budi.rahman@konstanta.my.id` | Akademik, KETetap | `Konstanta2332` |
 | Tisya Aulika Nuri | `tisya.aulika.nuri@konstanta.my.id` | Akademik, Karyawan | `Konstanta2094` |
 | M. Rasya Azmi | `m..rasya.azmi@konstanta.my.id` | Akademik, Karyawan | `Konstanta1903` |
 | Mukti Karya Utama | `mukti.karya.utama@konstanta.my.id` | KETetap | `Konstanta2389` |
-| M. Arief Ridwan | `m..arief.ridwan@konstanta.my.id` | KETetap | `Konstanta9771` |
+| M. Arief Ridwan | `m..arief.ridwan@konstanta.my.id` | KETetap, Eval | `Konstanta9771` |
 | Retno Yusniawati | `retno.yusniawati@konstanta.my.id` | KETetap | `Konstanta6142` |
 | Ibnu Sina | `ibnu.sina@konstanta.my.id` | KETetap | `Konstanta5764` |
 | Inggrit Maylinda | `inggrit.maylinda@konstanta.my.id` | KETetap | `Konstanta1903` |

@@ -3,7 +3,19 @@
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookies } from "next/headers";
-import { Schedule, ScheduleStatus, User, Student, Period, StudentSessionReport } from "@/lib/types";
+import {
+  Schedule,
+  ScheduleStatus,
+  User,
+  Student,
+  Period,
+  StudentSessionReport,
+  ParentLink,
+  EvaluationAssessment,
+  EvaluationResult,
+  EvaluationStatus,
+  EvaluationType,
+} from "@/lib/types";
 import { mapProfileToUser } from "@/lib/profile-mapper";
 import { revalidatePath } from "next/cache";
 
@@ -17,6 +29,69 @@ function generateInitialPassword() {
   return `Konstanta${digits}`;
 }
 
+// Guards the OTK/KEnz account-management actions below, which use the
+// admin/service-role client and so bypass RLS entirely — RLS tightening
+// alone does not protect them. Without this, any authenticated user
+// (including a freshly created OTK/KEnz account) could call these actions
+// directly and link themselves to arbitrary students.
+async function requireStaffCaller(allowed: string[] = ["admin", "akademik"]) {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const role = (user?.app_metadata as any)?.role;
+  if (!user || !allowed.includes(role)) {
+    throw new Error("Anda tidak memiliki akses untuk aksi ini.");
+  }
+}
+
+async function requireRoleCaller(allowed: string[]) {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const role = (user?.app_metadata as any)?.role;
+  if (!user || !allowed.includes(role)) {
+    throw new Error("Anda tidak memiliki akses untuk aksi ini.");
+  }
+  return { user, role };
+}
+
+// Independent TS port of scripts/generate-staff.js's cleanNameForEmail —
+// that script is a standalone CJS tool outside the Next build, same
+// duplication pattern already used for the role-mapping logic.
+function cleanNameForEmail(name: string): string {
+  let clean = name.replace(/\s*\([^)]*\)\s*/g, "").trim().replace(/\s+/g, " ");
+  clean = clean.replace(/[^a-zA-Z0-9\s.]/g, "");
+  return clean.toLowerCase().split(" ").filter(Boolean).join(".");
+}
+
+// Tries `local@konstanta.my.id`, then `local2@...`, `local3@...` etc. on
+// collision — OTK/KEnz emails are always auto-generated (unlike
+// createTeacher, where Akademik types the email by hand), so collisions
+// are likely (siblings, common first names).
+async function createAuthUserWithUniqueEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  baseName: string,
+  password: string,
+  appMetadata: Record<string, unknown>,
+  userMetadata: Record<string, unknown>,
+) {
+  const local = cleanNameForEmail(baseName);
+  const domain = "konstanta.my.id";
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const email = attempt === 0 ? `${local}@${domain}` : `${local}${attempt + 1}@${domain}`;
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      app_metadata: appMetadata,
+      user_metadata: userMetadata,
+    });
+    if (!error) return { email, user: data.user! };
+    if (!/already registered|already exists|email_exists/i.test(error.message)) {
+      throw new Error(error.message);
+    }
+  }
+  throw new Error("Gagal membuat email unik setelah 20 percobaan.");
+}
+
 export async function getUsers() {
   const supabase = await getSupabase();
   const { data } = await supabase
@@ -28,6 +103,19 @@ export async function getUsers() {
 
   // email not saved on profiles for privacy, or fetched via auth later
   return data.map((profile: any) => mapProfileToUser(profile, ""));
+}
+
+export async function getTeachersForEvaluation(): Promise<User[]> {
+  await requireRoleCaller(["eval", "admin", "akademik"]);
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, role, full_name, teacher_id, teacher_type")
+    .in("role", ["ketetap", "kangguru"])
+    .order("full_name", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data || []).map((profile: any) => mapProfileToUser(profile, ""));
 }
 
 export async function getSchedules() {
@@ -131,6 +219,7 @@ export async function getStudents() {
     name: s.name,
     program: s.program,
     className: s.class_name || undefined,
+    hasAccount: !!s.auth_user_id,
   }));
 }
 
@@ -160,8 +249,328 @@ export async function getStudentSessionReports(
     sessionDate: r.session_date,
     attendance: r.attendance,
     progressNote: r.progress_note || "",
+    score: r.score === null || r.score === undefined ? undefined : Number(r.score),
     createdAt: r.created_at,
   }));
+}
+
+function mapEvaluationAssessment(row: any): EvaluationAssessment {
+  const rawResults = row.evaluation_results || [];
+  const rawRecipients = row.evaluation_teacher_recipients || [];
+
+  return {
+    id: row.id,
+    title: row.title,
+    assessmentType: row.assessment_type as EvaluationType,
+    subject: row.subject,
+    program: row.program || undefined,
+    className: row.class_name || undefined,
+    assessmentDate: row.assessment_date,
+    maxScore: row.max_score === null || row.max_score === undefined ? undefined : Number(row.max_score),
+    description: row.description || undefined,
+    status: row.status as EvaluationStatus,
+    createdBy: row.created_by,
+    createdByName: row.profiles?.full_name || undefined,
+    reviewNote: row.review_note || undefined,
+    publishedBy: row.published_by || undefined,
+    publishedAt: row.published_at || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    results: rawResults.map((r: any): EvaluationResult => ({
+      id: r.id,
+      assessmentId: r.assessment_id,
+      studentId: r.student_id,
+      studentName: r.students?.name || r.student_name || undefined,
+      score: r.score === null || r.score === undefined ? undefined : Number(r.score),
+      qualitativeFeedback: r.qualitative_feedback || "",
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    })),
+    teacherRecipients: rawRecipients.map((r: any) => ({
+      id: r.id,
+      assessmentId: r.assessment_id,
+      teacherProfileId: r.teacher_profile_id,
+      teacherId: r.teacher_id,
+      teacherName: r.teacher_name,
+      createdAt: r.created_at,
+    })),
+  };
+}
+
+async function assertEditableEvaluation(
+  admin: ReturnType<typeof createAdminClient>,
+  assessmentId: string,
+  userId: string,
+) {
+  const { data, error } = await admin
+    .from("evaluation_assessments")
+    .select("id, created_by, status")
+    .eq("id", assessmentId)
+    .single();
+
+  if (error || !data) throw new Error("Asesmen evaluasi tidak ditemukan.");
+  if (data.created_by !== userId || !["DRAFT", "REJECTED"].includes(data.status)) {
+    throw new Error("Asesmen ini tidak bisa diedit.");
+  }
+}
+
+export async function getEvaluationAssessments(): Promise<EvaluationAssessment[]> {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from("evaluation_assessments")
+    .select(`
+      *,
+      evaluation_results(*, students(name)),
+      evaluation_teacher_recipients(*)
+    `)
+    .order("assessment_date", { ascending: false });
+
+  return (data || []).map(mapEvaluationAssessment);
+}
+
+export async function getEvaluationResultsForStudent(
+  studentId: string,
+): Promise<EvaluationAssessment[]> {
+  const supabase = await getSupabase();
+  const { data: results } = await supabase
+    .from("evaluation_results")
+    .select("assessment_id")
+    .eq("student_id", studentId);
+
+  const assessmentIds = Array.from(new Set((results || []).map((r: any) => r.assessment_id)));
+  if (assessmentIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("evaluation_assessments")
+    .select(`
+      *,
+      evaluation_results(*, students(name)),
+      evaluation_teacher_recipients(*)
+    `)
+    .in("id", assessmentIds)
+    .eq("status", "PUBLISHED")
+    .order("assessment_date", { ascending: false });
+
+  return (data || [])
+    .map(mapEvaluationAssessment)
+    .map((assessment) => ({
+      ...assessment,
+      results: assessment.results.filter((r) => r.studentId === studentId),
+    }))
+    .filter((assessment) => assessment.results.length > 0);
+}
+
+export async function getEvaluationAssessmentsForTeacher(): Promise<EvaluationAssessment[]> {
+  const { user } = await requireRoleCaller(["ketetap", "kangguru"]);
+  const supabase = await getSupabase();
+
+  const { data: recipients } = await supabase
+    .from("evaluation_teacher_recipients")
+    .select("assessment_id")
+    .eq("teacher_profile_id", user.id);
+
+  const assessmentIds = Array.from(new Set((recipients || []).map((r: any) => r.assessment_id)));
+  if (assessmentIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("evaluation_assessments")
+    .select(`
+      *,
+      evaluation_results(*, students(name)),
+      evaluation_teacher_recipients(*)
+    `)
+    .in("id", assessmentIds)
+    .eq("status", "PUBLISHED")
+    .order("assessment_date", { ascending: false });
+
+  return (data || []).map(mapEvaluationAssessment);
+}
+
+export async function createEvaluationAssessment(data: {
+  title: string;
+  assessmentType: EvaluationType;
+  subject: string;
+  program?: string;
+  className?: string;
+  assessmentDate: string;
+  maxScore?: number | null;
+  description?: string;
+}) {
+  const { user } = await requireRoleCaller(["eval"]);
+  const admin = createAdminClient();
+  const id = `EV${Date.now()}`;
+  const { error } = await admin.from("evaluation_assessments").insert({
+    id,
+    title: data.title,
+    assessment_type: data.assessmentType,
+    subject: data.subject,
+    program: data.program || null,
+    class_name: data.className || null,
+    assessment_date: data.assessmentDate,
+    max_score: data.maxScore ?? null,
+    description: data.description || null,
+    status: "DRAFT",
+    created_by: user.id,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+  return id;
+}
+
+export async function updateEvaluationAssessment(
+  id: string,
+  data: Partial<{
+    title: string;
+    assessmentType: EvaluationType;
+    subject: string;
+    program: string;
+    className: string;
+    assessmentDate: string;
+    maxScore: number | null;
+    description: string;
+  }>,
+) {
+  const { user } = await requireRoleCaller(["eval"]);
+  const admin = createAdminClient();
+  await assertEditableEvaluation(admin, id, user.id);
+
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.assessmentType !== undefined) updateData.assessment_type = data.assessmentType;
+  if (data.subject !== undefined) updateData.subject = data.subject;
+  if (data.program !== undefined) updateData.program = data.program || null;
+  if (data.className !== undefined) updateData.class_name = data.className || null;
+  if (data.assessmentDate !== undefined) updateData.assessment_date = data.assessmentDate;
+  if (data.maxScore !== undefined) updateData.max_score = data.maxScore;
+  if (data.description !== undefined) updateData.description = data.description || null;
+
+  const { error } = await admin.from("evaluation_assessments").update(updateData).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+}
+
+export async function upsertEvaluationResultsBulk(
+  assessmentId: string,
+  results: { studentId: string; score?: number | null; qualitativeFeedback: string }[],
+) {
+  const { user } = await requireRoleCaller(["eval"]);
+  const admin = createAdminClient();
+  await assertEditableEvaluation(admin, assessmentId, user.id);
+
+  const now = new Date().toISOString();
+  const rows = results
+    .filter((r) => r.studentId && (r.score !== null && r.score !== undefined || r.qualitativeFeedback.trim()))
+    .map((r) => ({
+      id: `${assessmentId}_${r.studentId}`,
+      assessment_id: assessmentId,
+      student_id: r.studentId,
+      score: r.score ?? null,
+      qualitative_feedback: r.qualitativeFeedback.trim(),
+      updated_at: now,
+    }));
+
+  const { data: existing } = await admin
+    .from("evaluation_results")
+    .select("student_id")
+    .eq("assessment_id", assessmentId);
+  const keepIds = new Set(rows.map((r) => r.student_id));
+  const deleteIds = (existing || []).map((r: any) => r.student_id).filter((studentId: string) => !keepIds.has(studentId));
+
+  if (deleteIds.length > 0) {
+    const { error: deleteError } = await admin
+      .from("evaluation_results")
+      .delete()
+      .eq("assessment_id", assessmentId)
+      .in("student_id", deleteIds);
+    if (deleteError) throw new Error(deleteError.message);
+  }
+
+  if (rows.length > 0) {
+    const { error } = await admin
+      .from("evaluation_results")
+      .upsert(rows, { onConflict: "id" });
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
+export async function setEvaluationTeacherRecipients(
+  assessmentId: string,
+  teachers: { profileId: string; teacherId: string; teacherName: string }[],
+) {
+  const { user } = await requireRoleCaller(["eval"]);
+  const admin = createAdminClient();
+  await assertEditableEvaluation(admin, assessmentId, user.id);
+
+  const { error: deleteError } = await admin
+    .from("evaluation_teacher_recipients")
+    .delete()
+    .eq("assessment_id", assessmentId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  const rows = teachers.map((t) => ({
+    id: `${assessmentId}_${t.profileId}`,
+    assessment_id: assessmentId,
+    teacher_profile_id: t.profileId,
+    teacher_id: t.teacherId,
+    teacher_name: t.teacherName,
+  }));
+
+  if (rows.length > 0) {
+    const { error } = await admin.from("evaluation_teacher_recipients").insert(rows);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
+export async function submitEvaluationAssessment(id: string) {
+  const { user } = await requireRoleCaller(["eval"]);
+  const admin = createAdminClient();
+  await assertEditableEvaluation(admin, id, user.id);
+
+  const { error } = await admin
+    .from("evaluation_assessments")
+    .update({ status: "SUBMITTED", review_note: null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+}
+
+export async function publishEvaluationAssessment(id: string) {
+  const { user } = await requireRoleCaller(["admin", "akademik"]);
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("evaluation_assessments")
+    .update({
+      status: "PUBLISHED",
+      published_by: user.id,
+      published_at: new Date().toISOString(),
+      review_note: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "SUBMITTED");
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+}
+
+export async function rejectEvaluationAssessment(id: string, note: string) {
+  await requireRoleCaller(["admin", "akademik"]);
+  if (!note.trim()) throw new Error("Catatan reject wajib diisi.");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("evaluation_assessments")
+    .update({
+      status: "REJECTED",
+      review_note: note.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "SUBMITTED");
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
 }
 
 export async function getPrograms() {
@@ -255,6 +664,7 @@ export async function deletePeriod(id: string) {
 // profile row. Returns the generated password so the caller can hand it
 // to the new teacher; it cannot be retrieved again afterwards.
 export async function createTeacher(data: Partial<User>) {
+  await requireStaffCaller();
   if (!data.email) {
     throw new Error("Email wajib diisi untuk membuat akun login guru.");
   }
@@ -308,6 +718,7 @@ export async function createTeacher(data: Partial<User>) {
 }
 
 export async function updateTeacher(id: string, data: Partial<User>) {
+  await requireStaffCaller();
   const admin = createAdminClient();
   const updateData: any = {};
   if (data.name) updateData.full_name = data.name;
@@ -351,9 +762,180 @@ export async function updateTeacher(id: string, data: Partial<User>) {
 }
 
 export async function deleteTeacher(id: string) {
+  await requireStaffCaller();
   const admin = createAdminClient();
   await admin.from("profiles").delete().eq("id", id);
   await admin.auth.admin.deleteUser(id);
+  revalidatePath("/");
+}
+
+export async function createEvalAccount(data: { name: string; email: string }) {
+  await requireStaffCaller(["admin"]);
+  if (!data.name || !data.email) {
+    throw new Error("Nama dan email Eval wajib diisi.");
+  }
+
+  const admin = createAdminClient();
+  const password = generateInitialPassword();
+
+  const { data: created, error: authError } = await admin.auth.admin.createUser({
+    email: data.email,
+    password,
+    email_confirm: true,
+    app_metadata: {
+      provider: "email",
+      providers: ["email"],
+      role: "eval",
+      roles: ["eval"],
+    },
+    user_metadata: { full_name: data.name },
+  });
+
+  if (authError || !created.user) {
+    throw new Error(authError?.message || "Gagal membuat akun Eval.");
+  }
+
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: created.user.id,
+    role: "eval",
+    full_name: data.name,
+    must_change_password: true,
+  });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(created.user.id);
+    throw new Error(profileError.message);
+  }
+
+  revalidatePath("/");
+  return { email: data.email, password };
+}
+
+// Creates a KEnz (student) login for an existing students row.
+export async function createStudentAccount(studentId: string) {
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  const { data: student, error: studentErr } = await admin
+    .from("students").select("*").eq("id", studentId).single();
+  if (studentErr || !student) throw new Error("Siswa tidak ditemukan.");
+  if (student.auth_user_id) throw new Error("Siswa ini sudah memiliki akun login.");
+
+  const password = generateInitialPassword();
+  const { email, user } = await createAuthUserWithUniqueEmail(
+    admin, student.name, password,
+    { provider: "email", providers: ["email"], role: "kenz", roles: ["kenz"] },
+    { full_name: student.name },
+  );
+
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: user.id, role: "kenz", full_name: student.name, must_change_password: true,
+  });
+  if (profileError) {
+    await admin.auth.admin.deleteUser(user.id);
+    throw new Error(profileError.message);
+  }
+
+  const { error: linkError } = await admin.from("students")
+    .update({ auth_user_id: user.id }).eq("id", studentId);
+  if (linkError) {
+    await admin.from("profiles").delete().eq("id", user.id);
+    await admin.auth.admin.deleteUser(user.id);
+    throw new Error(linkError.message);
+  }
+
+  revalidatePath("/");
+  return { email, password };
+}
+
+// Creates a new OTK (parent) login and links it to one or more students.
+export async function createParentAccount(data: { name: string; studentIds: string[] }) {
+  await requireStaffCaller();
+  if (!data.name) throw new Error("Nama orang tua wajib diisi.");
+  if (!data.studentIds?.length) throw new Error("Pilih minimal satu siswa untuk dihubungkan.");
+
+  const admin = createAdminClient();
+  const password = generateInitialPassword();
+  const { email, user } = await createAuthUserWithUniqueEmail(
+    admin, data.name, password,
+    { provider: "email", providers: ["email"], role: "otk", roles: ["otk"] },
+    { full_name: data.name },
+  );
+
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: user.id, role: "otk", full_name: data.name, must_change_password: true,
+  });
+  if (profileError) {
+    await admin.auth.admin.deleteUser(user.id);
+    throw new Error(profileError.message);
+  }
+
+  const { error: linkError } = await admin.from("parent_student_links").insert(
+    data.studentIds.map((sid) => ({ id: `${user.id}_${sid}`, parent_id: user.id, student_id: sid })),
+  );
+  if (linkError) {
+    await admin.from("profiles").delete().eq("id", user.id);
+    await admin.auth.admin.deleteUser(user.id);
+    throw new Error(linkError.message);
+  }
+
+  revalidatePath("/");
+  return { email, password };
+}
+
+// Links an already-existing OTK account to another child (second sibling case).
+export async function linkParentToStudent(parentId: string, studentId: string, relationship?: string) {
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  const { error } = await admin.from("parent_student_links").insert({
+    id: `${parentId}_${studentId}`, parent_id: parentId, student_id: studentId, relationship: relationship || null,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+}
+
+export async function unlinkParentFromStudent(parentId: string, studentId: string) {
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  await admin.from("parent_student_links").delete().eq("parent_id", parentId).eq("student_id", studentId);
+  revalidatePath("/");
+}
+
+// For the "link an existing parent" picker in the Data Siswa tab.
+export async function getParentAccounts(): Promise<{ id: string; name: string }[]> {
+  const supabase = await getSupabase();
+  const { data } = await supabase.from("profiles").select("id, full_name").eq("role", "otk").order("full_name");
+  return (data || []).map((p: any) => ({ id: p.id, name: p.full_name }));
+}
+
+export async function getParentLinksForStudent(studentId: string): Promise<ParentLink[]> {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from("parent_student_links")
+    .select("id, parent_id, student_id, relationship, profiles(full_name)")
+    .eq("student_id", studentId);
+  return (data || []).map((r: any) => ({
+    id: r.id, parentId: r.parent_id, studentId: r.student_id,
+    parentName: r.profiles?.full_name || "", relationship: r.relationship || undefined,
+  }));
+}
+
+export async function deleteStudentAccount(studentId: string) {
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  const { data: student } = await admin.from("students").select("auth_user_id").eq("id", studentId).single();
+  if (student?.auth_user_id) {
+    await admin.from("profiles").delete().eq("id", student.auth_user_id);
+    await admin.auth.admin.deleteUser(student.auth_user_id);
+  }
+  revalidatePath("/");
+}
+
+export async function deleteParentAccount(parentId: string) {
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  await admin.from("parent_student_links").delete().eq("parent_id", parentId);
+  await admin.from("profiles").delete().eq("id", parentId);
+  await admin.auth.admin.deleteUser(parentId);
   revalidatePath("/");
 }
 
@@ -362,6 +944,7 @@ export async function payTeacherSchedules(
   startDate: string,
   endDate: string,
 ) {
+  await requireRoleCaller(["admin"]);
   const supabase = await getSupabase();
   await supabase
     .from("schedules")
@@ -375,11 +958,57 @@ export async function payTeacherSchedules(
 
 export async function setSchedulesArchived(ids: string[], archived: boolean) {
   if (ids.length === 0) return;
-  const supabase = await getSupabase();
-  await supabase
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("schedules")
     .update({ archived })
     .in("id", ids);
+  if (error) throw new Error(`Gagal mengarsipkan jadwal: ${error.message}`);
+  revalidatePath("/");
+}
+
+export async function deleteSchedule(id: string) {
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  // Also delete related student_session_reports
+  await admin.from("student_session_reports").delete().eq("schedule_id", id);
+  const { error } = await admin.from("schedules").delete().eq("id", id);
+  if (error) throw new Error(`Gagal menghapus jadwal: ${error.message}`);
+  revalidatePath("/");
+}
+
+export async function deleteSchedulesBulk(ids: string[]) {
+  if (ids.length === 0) return;
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  await admin.from("student_session_reports").delete().in("schedule_id", ids);
+  const { error } = await admin.from("schedules").delete().in("id", ids);
+  if (error) throw new Error(`Gagal menghapus jadwal: ${error.message}`);
+  revalidatePath("/");
+}
+
+export async function updateSchedule(id: string, data: Partial<Schedule>) {
+  await requireStaffCaller();
+  const admin = createAdminClient();
+  const updateData: Record<string, unknown> = {};
+  if (data.date !== undefined) updateData.date = data.date;
+  if (data.startTime !== undefined) updateData.start_time = data.startTime;
+  if (data.endTime !== undefined) updateData.end_time = data.endTime;
+  if (data.program !== undefined) updateData.program = data.program;
+  if (data.subject !== undefined) updateData.subject = data.subject;
+  if (data.topic !== undefined) updateData.topic = data.topic;
+  if (data.teacherId !== undefined) updateData.teacher_id = data.teacherId;
+  if (data.teacherName !== undefined) updateData.teacher_name = data.teacherName;
+  if (data.studentIds !== undefined) updateData.student_ids = data.studentIds;
+  if (data.students !== undefined) updateData.students_data = data.students;
+  if (data.branch !== undefined) updateData.branch = data.branch;
+  if (data.honorAmount !== undefined) updateData.honor_amount = data.honorAmount;
+  if (data.honorType !== undefined) updateData.honor_type = data.honorType;
+  if (data.classMode !== undefined) updateData.class_mode = data.classMode;
+
+  const { error } = await admin.from("schedules").update(updateData).eq("id", id);
+  if (error) throw new Error(`Gagal mengupdate jadwal: ${error.message}`);
   revalidatePath("/");
 }
 
@@ -404,7 +1033,7 @@ export async function updateScheduleHonor(id: string, honorAmount: number, honor
   revalidatePath("/");
 }
 
-export async function checkIn(id: string, lat: number, lng: number) {
+export async function checkIn(id: string, lat: number, lng: number, gpsBypassed?: boolean, distance?: number) {
   const supabase = await getSupabase();
   const time = new Date().toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -415,7 +1044,7 @@ export async function checkIn(id: string, lat: number, lng: number) {
     .from("schedules")
     .update({
       status: "IN_PROGRESS",
-      check_in: { time, lat, lng }
+      check_in: { time, lat, lng, gpsBypassed, distance }
     })
     .eq("id", id);
   revalidatePath("/");
@@ -433,12 +1062,17 @@ export async function checkOutAndReport(
     minute: "2-digit",
   });
 
+  // Clear revisionNote from report upon resubmission
+  const cleanedReport = { ...report } as any;
+  delete cleanedReport.revisionNote;
+  delete cleanedReport.revision_note;
+
   const { data: updated } = await supabase
     .from("schedules")
     .update({
       status: "WAITING_VERIFICATION",
       check_out: { time, lat, lng },
-      report
+      report: cleanedReport
     })
     .eq("id", id)
     .select()
@@ -466,6 +1100,7 @@ export async function checkOutAndReport(
               session_date: updated.date,
               attendance: sp.attendance,
               progress_note: sp.progress,
+              score: sp.score ?? null,
             },
             { onConflict: "id" },
           )
@@ -475,6 +1110,31 @@ export async function checkOutAndReport(
       ),
     );
   }
+
+  revalidatePath("/");
+}
+
+export async function rejectReportWithNote(id: string, note: string) {
+  const supabase = await getSupabase();
+
+  const { data: current } = await supabase
+    .from("schedules")
+    .select("report")
+    .eq("id", id)
+    .single();
+
+  const updatedReport = {
+    ...(current?.report || {}),
+    revisionNote: note,
+  };
+
+  await supabase
+    .from("schedules")
+    .update({
+      status: "REJECTED",
+      report: updatedReport,
+    })
+    .eq("id", id);
 
   revalidatePath("/");
 }

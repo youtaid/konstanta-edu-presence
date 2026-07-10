@@ -105,8 +105,13 @@ const karyawanNames = [
   "Ahmad Fatihul Ihsan"
 ];
 
+const evalNames = [
+  "Farid Fachrudin",
+  "M. Arief Ridwan"
+];
+
 // Helper to priority rank roles for profiles.role
-const rolePriority = ["admin", "akademik", "ketetap", "kangguru", "karyawan"];
+const rolePriority = ["admin", "akademik", "eval", "ketetap", "kangguru", "karyawan"];
 
 function getPrimaryRole(roles) {
   for (const role of rolePriority) {
@@ -183,6 +188,7 @@ akademikNames.forEach(n => addPerson(n, "akademik"));
 ketetapNames.forEach(n => addPerson(n, "ketetap"));
 kangguruNames.forEach(n => addPerson(n, "kangguru"));
 karyawanNames.forEach(n => addPerson(n, "karyawan"));
+evalNames.forEach(n => addPerson(n, "eval"));
 
 // Demo accounts (bypass first-login password reset)
 const demoAccounts = [
@@ -190,7 +196,13 @@ const demoAccounts = [
   { name: "Demo Akademik", email: "demo.akademik@konstanta.my.id", password: "AkademikDemo123!", roles: ["akademik"] },
   { name: "Demo KETetap", email: "demo.ketetap@konstanta.my.id", password: "KetetapDemo123!", roles: ["ketetap"] },
   { name: "Demo KangGuru", email: "demo.kangguru@konstanta.my.id", password: "KangguruDemo123!", roles: ["kangguru"] },
-  { name: "Demo Karyawan", email: "demo.karyawan@konstanta.my.id", password: "KaryawanDemo123!", roles: ["karyawan"] }
+  { name: "Demo Eval", email: "demo.eval@konstanta.my.id", password: "EvalDemo123!", roles: ["eval"] },
+  { name: "Demo Karyawan", email: "demo.karyawan@konstanta.my.id", password: "KaryawanDemo123!", roles: ["karyawan"] },
+  // Linked to demo students (ST1/ST2) by supabase/seed_lms.sql after this
+  // seed runs — see that file for the parent_student_links / auth_user_id
+  // wiring, since this script only knows about staff, not students.
+  { name: "Demo Orang Tua", email: "demo.otk@konstanta.my.id", password: "OtkDemo123!", roles: ["otk"] },
+  { name: "Demo Siswa", email: "demo.kenz@konstanta.my.id", password: "KenzDemo123!", roles: ["kenz"] }
 ];
 
 // ============================================================
@@ -225,7 +237,7 @@ function buildUserSql(user, mustChangePasswordForNewProfile) {
   return `
   -- ${user.name} (${user.roles.join(', ')})
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -235,6 +247,7 @@ function buildUserSql(user, mustChangePasswordForNewProfile) {
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     '${user.email}',
@@ -321,7 +334,12 @@ let md = `# Staff Credentials (Kredensial Login Staff - konstanta.my.id)
 | Akademik | Demo Akademik | \`demo.akademik@konstanta.my.id\` | \`AkademikDemo123!\` |
 | KETetap | Demo KETetap | \`demo.ketetap@konstanta.my.id\` | \`KetetapDemo123!\` |
 | KangGuru | Demo KangGuru | \`demo.kangguru@konstanta.my.id\` | \`KangguruDemo123!\` |
+| Eval | Demo Eval | \`demo.eval@konstanta.my.id\` | \`EvalDemo123!\` |
 | Karyawan | Demo Karyawan | \`demo.karyawan@konstanta.my.id\` | \`KaryawanDemo123!\` |
+| OTK (Orang Tua) | Demo Orang Tua | \`demo.otk@konstanta.my.id\` | \`OtkDemo123!\` |
+| KEnz (Siswa) | Demo Siswa | \`demo.kenz@konstanta.my.id\` | \`KenzDemo123!\` |
+
+> **Catatan OTK/KEnz**: \`Demo Orang Tua\` terhubung ke 2 anak demo (Ahmad — ST1, Siti — ST2) untuk menguji selector multi-anak; \`Demo Siswa\` adalah akun Ahmad (ST1) sendiri. Riwayat kehadiran/nilai untuk kedua akun ini dibuat oleh \`supabase/seed_lms.sql\` — jalankan file itu setelah \`seed_staff.sql\` agar datanya muncul.
 
 ## Akun Staff Otomatis (Wajib Reset Password pada Login Pertama)
 

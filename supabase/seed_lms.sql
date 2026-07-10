@@ -170,3 +170,44 @@ ON CONFLICT (id) DO UPDATE SET
   report = EXCLUDED.report,
   check_in = EXCLUDED.check_in,
   check_out = EXCLUDED.check_out;
+
+-- 7. Seed STUDENT_SESSION_REPORTS (demo attendance/progress/nilai data for
+-- ST1 and ST2) — this table is normally only populated by
+-- checkOutAndReport() at runtime, so a fresh seed otherwise leaves it
+-- empty and the Demo Orang Tua (OTK) / Demo Siswa (KEnz) accounts below
+-- would have nothing to browse. 'S3_ST2' mirrors the report already on
+-- schedule S3 above; the rest are synthetic history (no matching row in
+-- `schedules` needed — this table has no FK, same as the rest of this
+-- schema). Score is only set on ELC/Privat rows to match the app's
+-- "Nilai KBM" gate.
+INSERT INTO public.student_session_reports (
+  id, schedule_id, student_id, student_name, program, class_name, subject,
+  topic, teacher_id, teacher_name, session_date, attendance, progress_note, score, created_at
+) values
+('S_DEMO_1_ST1', 'S_DEMO_1', 'ST1', 'Ahmad', 'ELC', '12-IPA-1', 'Matematika', 'Integral Tak Tentu', 'T1', 'Budi Santoso', '2026-06-18', 'Hadir', 'Ahmad aktif menjawab soal integral, pemahaman baik.', 88, now()),
+('S_DEMO_2_ST1', 'S_DEMO_2', 'ST1', 'Ahmad', 'ELC', '12-IPA-1', 'Fisika', 'Gerak Lurus', 'T2', 'Siti Aminah', '2026-06-25', 'Hadir', 'Mengerjakan soal gerak lurus dengan baik, perlu latihan soal HOTS.', 82, now()),
+('S_DEMO_3_ST1', 'S_DEMO_3', 'ST1', 'Ahmad', 'ELC', '12-IPA-1', 'Kimia', 'Stoikiometri', 'T1', 'Budi Santoso', '2026-07-02', 'Izin', 'Izin karena sakit ringan, materi susulan diberikan.', NULL, now()),
+('S_DEMO_4_ST1', 'S_DEMO_4', 'ST1', 'Ahmad', 'ELC', '12-IPA-1', 'Matematika', 'Limit Fungsi', 'T1', 'Budi Santoso', '2026-07-08', 'Hadir', 'Peningkatan signifikan di topik limit fungsi.', 90, now()),
+('S3_ST2', 'S3', 'ST2', 'Siti', 'Privat', '12-IPA-2', 'Fisika', 'Listrik Statis', 'T1', 'Budi Santoso', '2026-06-22', 'Hadir', 'Siti mulai paham konsep gaya tolak menolak, tapi butuh latihan soal lebih banyak.', 75, now()),
+('S_DEMO_5_ST2', 'S_DEMO_5', 'ST2', 'Siti', 'Privat', '12-IPA-2', 'Matematika', 'Trigonometri', 'T1', 'Budi Santoso', '2026-06-29', 'Sakit', 'Sakit demam, sesi ditunda.', NULL, now()),
+('S_DEMO_6_ST2', 'S_DEMO_6', 'ST2', 'Siti', 'Privat', '12-IPA-2', 'Fisika', 'Rangkaian Listrik', 'T1', 'Budi Santoso', '2026-07-06', 'Hadir', 'Sudah bisa menyelesaikan soal rangkaian listrik sederhana.', 85, now())
+ON CONFLICT (id) DO UPDATE SET
+  attendance = EXCLUDED.attendance,
+  progress_note = EXCLUDED.progress_note,
+  score = EXCLUDED.score;
+
+-- 8. Link Demo Siswa (KEnz) & Demo Orang Tua (OTK) demo accounts (seeded by
+-- supabase/seed_staff.sql — run that BEFORE this file) to demo students by
+-- email lookup, since auth.users ids are Supabase-generated and not known
+-- ahead of time. Written so it's a no-op (inserts/updates nothing) rather
+-- than erroring if seed_staff.sql hasn't run yet.
+UPDATE public.students
+SET auth_user_id = (SELECT id FROM auth.users WHERE email = 'demo.kenz@konstanta.my.id')
+WHERE id = 'ST1'
+  AND EXISTS (SELECT 1 FROM auth.users WHERE email = 'demo.kenz@konstanta.my.id');
+
+INSERT INTO public.parent_student_links (id, parent_id, student_id, relationship, created_at)
+SELECT u.id::text || '_' || v.sid, u.id, v.sid, 'Wali', now()
+FROM auth.users u, (VALUES ('ST1'), ('ST2')) AS v(sid)
+WHERE u.email = 'demo.otk@konstanta.my.id'
+ON CONFLICT (parent_id, student_id) DO NOTHING;

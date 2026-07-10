@@ -39,10 +39,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .single();
 
           if (profile) {
-            let roleMapped: 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'KARYAWAN' = 'KARYAWAN';
+            let roleMapped: User["role"] = 'KARYAWAN';
             if (profile.role === 'admin') roleMapped = 'ADMIN';
             else if (profile.role === 'akademik') roleMapped = 'ACADEMIC';
             else if (profile.role === 'ketetap' || profile.role === 'kangguru') roleMapped = 'TEACHER';
+            else if (profile.role === 'eval') roleMapped = 'EVAL';
+            else if (profile.role === 'otk') roleMapped = 'OTK';
+            else if (profile.role === 'kenz') roleMapped = 'KENZ';
 
             const mappedUser: User = {
               id: profile.id,

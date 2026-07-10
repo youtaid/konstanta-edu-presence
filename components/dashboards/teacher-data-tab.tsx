@@ -43,6 +43,9 @@ function TeacherDataTab({
     password: string;
   } | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState("ALL");
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -86,14 +89,18 @@ function TeacherDataTab({
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.email) return;
+    if (!formData.name || (!editingId && !formData.email)) return;
     setLoading(true);
     setError(null);
     const { createTeacher, updateTeacher } = await import("@/app/actions");
 
     try {
       if (editingId) {
-        await updateTeacher(editingId, formData);
+        const updateData = { ...formData };
+        if (!updateData.email) {
+          delete updateData.email;
+        }
+        await updateTeacher(editingId, updateData);
         resetForm();
       } else {
         const result = await createTeacher(formData);
@@ -112,6 +119,12 @@ function TeacherDataTab({
       setLoading(false);
     }
   };
+
+  const filteredTeachers = teachers.filter((t) => {
+    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = filterType === "ALL" ? true : t.teacherType === filterType;
+    return matchesSearch && matchesType;
+  });
 
   return (
     <div className="space-y-6">
@@ -316,6 +329,29 @@ function TeacherDataTab({
         </Card>
       )}
 
+      <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 border rounded-xl shadow-sm">
+        <div className="flex-1">
+          <input
+            type="text"
+            className="w-full border rounded-md p-2 text-sm bg-white"
+            placeholder="Cari nama guru..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <select
+            className="w-full border rounded-md p-2 text-sm bg-white"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+          >
+            <option value="ALL">Semua Tipe</option>
+            <option value="TETAP">KETetap (Tetap)</option>
+            <option value="FREELANCE">KangGuru (Freelance)</option>
+          </select>
+        </div>
+      </div>
+
       <div className="overflow-x-auto bg-white border rounded-xl shadow-sm">
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-50 text-gray-700">
@@ -327,7 +363,7 @@ function TeacherDataTab({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {teachers.map((t) => (
+            {filteredTeachers.map((t) => (
               <tr key={t.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-900">
                   {t.name}

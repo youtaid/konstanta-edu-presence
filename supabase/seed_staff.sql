@@ -13,7 +13,7 @@ BEGIN
 
   -- Demo Admin (admin)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -23,6 +23,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'demo.admin@konstanta.my.id',
@@ -65,7 +66,7 @@ BEGIN
 
   -- Demo Akademik (akademik)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -75,6 +76,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'demo.akademik@konstanta.my.id',
@@ -117,7 +119,7 @@ BEGIN
 
   -- Demo KETetap (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -127,6 +129,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'demo.ketetap@konstanta.my.id',
@@ -169,7 +172,7 @@ BEGIN
 
   -- Demo KangGuru (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -179,6 +182,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'demo.kangguru@konstanta.my.id',
@@ -219,9 +223,9 @@ BEGIN
     full_name = EXCLUDED.full_name,
     updated_at = now();
 
-  -- Demo Karyawan (karyawan)
+  -- Demo Eval (eval)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -231,6 +235,60 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
+    'demo.eval@konstanta.my.id',
+    crypt('EvalDemo123!', gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"],"role":"eval","roles":["eval"]}'::jsonb,
+    '{"full_name":"Demo Eval"}'::jsonb,
+    false, false, now(), now(), '', '', '', ''
+  WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'demo.eval@konstanta.my.id');
+
+  UPDATE auth.users SET
+    raw_app_meta_data = '{"provider":"email","providers":["email"],"role":"eval","roles":["eval"]}'::jsonb,
+    raw_user_meta_data = '{"full_name":"Demo Eval"}'::jsonb,
+    updated_at = now()
+  WHERE email = 'demo.eval@konstanta.my.id';
+
+  INSERT INTO auth.identities (
+    id, user_id, provider_id, provider,
+    identity_data, last_sign_in_at,
+    created_at, updated_at
+  )
+  SELECT
+    u.id, u.id, u.email, 'email',
+    json_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true, 'provider', 'email')::jsonb,
+    now(), now(), now()
+  FROM auth.users u
+  WHERE u.email = 'demo.eval@konstanta.my.id'
+    AND NOT EXISTS (
+      SELECT 1 FROM auth.identities i WHERE i.provider = 'email' AND i.provider_id = u.email
+    );
+
+  INSERT INTO public.profiles (id, role, full_name, must_change_password, created_at, updated_at)
+  SELECT u.id, 'eval', 'Demo Eval', false, now(), now()
+  FROM auth.users u
+  WHERE u.email = 'demo.eval@konstanta.my.id'
+  ON CONFLICT (id) DO UPDATE SET
+    role = EXCLUDED.role,
+    full_name = EXCLUDED.full_name,
+    updated_at = now();
+
+  -- Demo Karyawan (karyawan)
+  INSERT INTO auth.users (
+    id, instance_id, aud, role,
+    email, encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data,
+    is_super_admin, is_sso_user,
+    created_at, updated_at,
+    confirmation_token, recovery_token,
+    email_change_token_new, email_change
+  )
+  SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'demo.karyawan@konstanta.my.id',
@@ -271,13 +329,9 @@ BEGIN
     full_name = EXCLUDED.full_name,
     updated_at = now();
 
-  -- --------------------------------------------------------
-  -- STAFF ACCOUNTS
-  -- --------------------------------------------------------
-
-  -- Anisa Zunayah (admin, ketetap)
+  -- Demo Orang Tua (otk)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -287,6 +341,117 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
+    'demo.otk@konstanta.my.id',
+    crypt('OtkDemo123!', gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"],"role":"otk","roles":["otk"]}'::jsonb,
+    '{"full_name":"Demo Orang Tua"}'::jsonb,
+    false, false, now(), now(), '', '', '', ''
+  WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'demo.otk@konstanta.my.id');
+
+  UPDATE auth.users SET
+    raw_app_meta_data = '{"provider":"email","providers":["email"],"role":"otk","roles":["otk"]}'::jsonb,
+    raw_user_meta_data = '{"full_name":"Demo Orang Tua"}'::jsonb,
+    updated_at = now()
+  WHERE email = 'demo.otk@konstanta.my.id';
+
+  INSERT INTO auth.identities (
+    id, user_id, provider_id, provider,
+    identity_data, last_sign_in_at,
+    created_at, updated_at
+  )
+  SELECT
+    u.id, u.id, u.email, 'email',
+    json_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true, 'provider', 'email')::jsonb,
+    now(), now(), now()
+  FROM auth.users u
+  WHERE u.email = 'demo.otk@konstanta.my.id'
+    AND NOT EXISTS (
+      SELECT 1 FROM auth.identities i WHERE i.provider = 'email' AND i.provider_id = u.email
+    );
+
+  INSERT INTO public.profiles (id, role, full_name, must_change_password, created_at, updated_at)
+  SELECT u.id, 'otk', 'Demo Orang Tua', false, now(), now()
+  FROM auth.users u
+  WHERE u.email = 'demo.otk@konstanta.my.id'
+  ON CONFLICT (id) DO UPDATE SET
+    role = EXCLUDED.role,
+    full_name = EXCLUDED.full_name,
+    updated_at = now();
+
+  -- Demo Siswa (kenz)
+  INSERT INTO auth.users (
+    id, instance_id, aud, role,
+    email, encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data,
+    is_super_admin, is_sso_user,
+    created_at, updated_at,
+    confirmation_token, recovery_token,
+    email_change_token_new, email_change
+  )
+  SELECT
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
+    'demo.kenz@konstanta.my.id',
+    crypt('KenzDemo123!', gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"],"role":"kenz","roles":["kenz"]}'::jsonb,
+    '{"full_name":"Demo Siswa"}'::jsonb,
+    false, false, now(), now(), '', '', '', ''
+  WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'demo.kenz@konstanta.my.id');
+
+  UPDATE auth.users SET
+    raw_app_meta_data = '{"provider":"email","providers":["email"],"role":"kenz","roles":["kenz"]}'::jsonb,
+    raw_user_meta_data = '{"full_name":"Demo Siswa"}'::jsonb,
+    updated_at = now()
+  WHERE email = 'demo.kenz@konstanta.my.id';
+
+  INSERT INTO auth.identities (
+    id, user_id, provider_id, provider,
+    identity_data, last_sign_in_at,
+    created_at, updated_at
+  )
+  SELECT
+    u.id, u.id, u.email, 'email',
+    json_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true, 'provider', 'email')::jsonb,
+    now(), now(), now()
+  FROM auth.users u
+  WHERE u.email = 'demo.kenz@konstanta.my.id'
+    AND NOT EXISTS (
+      SELECT 1 FROM auth.identities i WHERE i.provider = 'email' AND i.provider_id = u.email
+    );
+
+  INSERT INTO public.profiles (id, role, full_name, must_change_password, created_at, updated_at)
+  SELECT u.id, 'kenz', 'Demo Siswa', false, now(), now()
+  FROM auth.users u
+  WHERE u.email = 'demo.kenz@konstanta.my.id'
+  ON CONFLICT (id) DO UPDATE SET
+    role = EXCLUDED.role,
+    full_name = EXCLUDED.full_name,
+    updated_at = now();
+
+  -- --------------------------------------------------------
+  -- STAFF ACCOUNTS
+  -- --------------------------------------------------------
+
+  -- Anisa Zunayah (admin, ketetap)
+  INSERT INTO auth.users (
+    id, instance_id, aud, role,
+    email, encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data,
+    is_super_admin, is_sso_user,
+    created_at, updated_at,
+    confirmation_token, recovery_token,
+    email_change_token_new, email_change
+  )
+  SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'anisa.zunayah@konstanta.my.id',
@@ -327,9 +492,9 @@ BEGIN
     full_name = EXCLUDED.full_name,
     updated_at = now();
 
-  -- Farid Fachrudin (admin, akademik, ketetap)
+  -- Farid Fachrudin (admin, akademik, ketetap, eval)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -339,18 +504,19 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'farid.fachrudin@konstanta.my.id',
     crypt('Konstanta1386', gen_salt('bf')),
     now(),
-    '{"provider":"email","providers":["email"],"role":"admin","roles":["admin","akademik","ketetap"]}'::jsonb,
+    '{"provider":"email","providers":["email"],"role":"admin","roles":["admin","akademik","ketetap","eval"]}'::jsonb,
     '{"full_name":"Farid Fachrudin"}'::jsonb,
     false, false, now(), now(), '', '', '', ''
   WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'farid.fachrudin@konstanta.my.id');
 
   UPDATE auth.users SET
-    raw_app_meta_data = '{"provider":"email","providers":["email"],"role":"admin","roles":["admin","akademik","ketetap"]}'::jsonb,
+    raw_app_meta_data = '{"provider":"email","providers":["email"],"role":"admin","roles":["admin","akademik","ketetap","eval"]}'::jsonb,
     raw_user_meta_data = '{"full_name":"Farid Fachrudin"}'::jsonb,
     updated_at = now()
   WHERE email = 'farid.fachrudin@konstanta.my.id';
@@ -381,7 +547,7 @@ BEGIN
 
   -- Farhanul Karim (admin, ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -391,6 +557,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'farhanul.karim@konstanta.my.id',
@@ -433,7 +600,7 @@ BEGIN
 
   -- Budi Rahman (akademik, ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -443,6 +610,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'budi.rahman@konstanta.my.id',
@@ -485,7 +653,7 @@ BEGIN
 
   -- Tisya Aulika Nuri (akademik, karyawan)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -495,6 +663,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'tisya.aulika.nuri@konstanta.my.id',
@@ -537,7 +706,7 @@ BEGIN
 
   -- M. Rasya Azmi (akademik, karyawan)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -547,6 +716,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'm..rasya.azmi@konstanta.my.id',
@@ -589,7 +759,7 @@ BEGIN
 
   -- Mukti Karya Utama (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -599,6 +769,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'mukti.karya.utama@konstanta.my.id',
@@ -639,9 +810,9 @@ BEGIN
     full_name = EXCLUDED.full_name,
     updated_at = now();
 
-  -- M. Arief Ridwan (ketetap)
+  -- M. Arief Ridwan (ketetap, eval)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -651,18 +822,19 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'm..arief.ridwan@konstanta.my.id',
     crypt('Konstanta9771', gen_salt('bf')),
     now(),
-    '{"provider":"email","providers":["email"],"role":"ketetap","roles":["ketetap"]}'::jsonb,
+    '{"provider":"email","providers":["email"],"role":"eval","roles":["ketetap","eval"]}'::jsonb,
     '{"full_name":"M. Arief Ridwan"}'::jsonb,
     false, false, now(), now(), '', '', '', ''
   WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'm..arief.ridwan@konstanta.my.id');
 
   UPDATE auth.users SET
-    raw_app_meta_data = '{"provider":"email","providers":["email"],"role":"ketetap","roles":["ketetap"]}'::jsonb,
+    raw_app_meta_data = '{"provider":"email","providers":["email"],"role":"eval","roles":["ketetap","eval"]}'::jsonb,
     raw_user_meta_data = '{"full_name":"M. Arief Ridwan"}'::jsonb,
     updated_at = now()
   WHERE email = 'm..arief.ridwan@konstanta.my.id';
@@ -683,7 +855,7 @@ BEGIN
     );
 
   INSERT INTO public.profiles (id, role, full_name, must_change_password, created_at, updated_at)
-  SELECT u.id, 'ketetap', 'M. Arief Ridwan', true, now(), now()
+  SELECT u.id, 'eval', 'M. Arief Ridwan', true, now(), now()
   FROM auth.users u
   WHERE u.email = 'm..arief.ridwan@konstanta.my.id'
   ON CONFLICT (id) DO UPDATE SET
@@ -693,7 +865,7 @@ BEGIN
 
   -- Retno Yusniawati (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -703,6 +875,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'retno.yusniawati@konstanta.my.id',
@@ -745,7 +918,7 @@ BEGIN
 
   -- Ibnu Sina (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -755,6 +928,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'ibnu.sina@konstanta.my.id',
@@ -797,7 +971,7 @@ BEGIN
 
   -- Inggrit Maylinda (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -807,6 +981,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'inggrit.maylinda@konstanta.my.id',
@@ -849,7 +1024,7 @@ BEGIN
 
   -- Ponco Arief Triyasto (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -859,6 +1034,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'ponco.arief.triyasto@konstanta.my.id',
@@ -901,7 +1077,7 @@ BEGIN
 
   -- M. Rafly Novanto (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -911,6 +1087,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'm..rafly.novanto@konstanta.my.id',
@@ -953,7 +1130,7 @@ BEGIN
 
   -- Akbar Ramadhian (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -963,6 +1140,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'akbar.ramadhian@konstanta.my.id',
@@ -1005,7 +1183,7 @@ BEGIN
 
   -- Fairuz Salsabilla (ketetap)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1015,6 +1193,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'fairuz.salsabilla@konstanta.my.id',
@@ -1057,7 +1236,7 @@ BEGIN
 
   -- Achmad Rivai (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1067,6 +1246,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'achmad.rivai@konstanta.my.id',
@@ -1109,7 +1289,7 @@ BEGIN
 
   -- Ade K Irawan (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1119,6 +1299,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'ade.k.irawan@konstanta.my.id',
@@ -1161,7 +1342,7 @@ BEGIN
 
   -- Aditya Perbawa (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1171,6 +1352,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'aditya.perbawa@konstanta.my.id',
@@ -1213,7 +1395,7 @@ BEGIN
 
   -- Ahmad Faris (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1223,6 +1405,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'ahmad.faris@konstanta.my.id',
@@ -1265,7 +1448,7 @@ BEGIN
 
   -- Al Akrom (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1275,6 +1458,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'al.akrom@konstanta.my.id',
@@ -1317,7 +1501,7 @@ BEGIN
 
   -- Akhit Anis (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1327,6 +1511,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'akhit.anis@konstanta.my.id',
@@ -1369,7 +1554,7 @@ BEGIN
 
   -- Andromeda (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1379,6 +1564,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'andromeda@konstanta.my.id',
@@ -1421,7 +1607,7 @@ BEGIN
 
   -- Annahel Aliesta (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1431,6 +1617,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'annahel.aliesta@konstanta.my.id',
@@ -1473,7 +1660,7 @@ BEGIN
 
   -- Annisa Michellia (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1483,6 +1670,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'annisa.michellia@konstanta.my.id',
@@ -1525,7 +1713,7 @@ BEGIN
 
   -- Arif Sapta Diputra (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1535,6 +1723,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'arif.sapta.diputra@konstanta.my.id',
@@ -1577,7 +1766,7 @@ BEGIN
 
   -- Aulia Dini (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1587,6 +1776,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'aulia.dini@konstanta.my.id',
@@ -1629,7 +1819,7 @@ BEGIN
 
   -- Cahya Sasmita (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1639,6 +1829,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'cahya.sasmita@konstanta.my.id',
@@ -1681,7 +1872,7 @@ BEGIN
 
   -- Candra Riyadi (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1691,6 +1882,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'candra.riyadi@konstanta.my.id',
@@ -1733,7 +1925,7 @@ BEGIN
 
   -- Cecep Saepudin Ahmad (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1743,6 +1935,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'cecep.saepudin.ahmad@konstanta.my.id',
@@ -1785,7 +1978,7 @@ BEGIN
 
   -- Daulat Harahap (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1795,6 +1988,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'daulat.harahap@konstanta.my.id',
@@ -1837,7 +2031,7 @@ BEGIN
 
   -- Dede Abdul Hakim (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1847,6 +2041,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'dede.abdul.hakim@konstanta.my.id',
@@ -1889,7 +2084,7 @@ BEGIN
 
   -- Dewi Siska (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1899,6 +2094,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'dewi.siska@konstanta.my.id',
@@ -1941,7 +2137,7 @@ BEGIN
 
   -- Dika Amalia Lutfiana (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -1951,6 +2147,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'dika.amalia.lutfiana@konstanta.my.id',
@@ -1993,7 +2190,7 @@ BEGIN
 
   -- Dolly Fernando (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2003,6 +2200,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'dolly.fernando@konstanta.my.id',
@@ -2045,7 +2243,7 @@ BEGIN
 
   -- Eko Priono (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2055,6 +2253,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'eko.priono@konstanta.my.id',
@@ -2097,7 +2296,7 @@ BEGIN
 
   -- Eko Wandoyo (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2107,6 +2306,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'eko.wandoyo@konstanta.my.id',
@@ -2149,7 +2349,7 @@ BEGIN
 
   -- Fachrizal Nurrachman (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2159,6 +2359,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'fachrizal.nurrachman@konstanta.my.id',
@@ -2201,7 +2402,7 @@ BEGIN
 
   -- Fadhilah Rahmani (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2211,6 +2412,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'fadhilah.rahmani@konstanta.my.id',
@@ -2253,7 +2455,7 @@ BEGIN
 
   -- Fahmi Firmansyah (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2263,6 +2465,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'fahmi.firmansyah@konstanta.my.id',
@@ -2305,7 +2508,7 @@ BEGIN
 
   -- Fawaidul Khoir (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2315,6 +2518,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'fawaidul.khoir@konstanta.my.id',
@@ -2357,7 +2561,7 @@ BEGIN
 
   -- Fasniyanto (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2367,6 +2571,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'fasniyanto@konstanta.my.id',
@@ -2409,7 +2614,7 @@ BEGIN
 
   -- Fathan Mubinan (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2419,6 +2624,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'fathan.mubinan@konstanta.my.id',
@@ -2461,7 +2667,7 @@ BEGIN
 
   -- Frimadani (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2471,6 +2677,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'frimadani@konstanta.my.id',
@@ -2513,7 +2720,7 @@ BEGIN
 
   -- Gentur Meshubudi (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2523,6 +2730,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'gentur.meshubudi@konstanta.my.id',
@@ -2565,7 +2773,7 @@ BEGIN
 
   -- Gianni Benhardi (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2575,6 +2783,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'gianni.benhardi@konstanta.my.id',
@@ -2617,7 +2826,7 @@ BEGIN
 
   -- Gilang Ainan (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2627,6 +2836,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'gilang.ainan@konstanta.my.id',
@@ -2669,7 +2879,7 @@ BEGIN
 
   -- Hanunah Sofa (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2679,6 +2889,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'hanunah.sofa@konstanta.my.id',
@@ -2721,7 +2932,7 @@ BEGIN
 
   -- Hasbiyallah (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2731,6 +2942,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'hasbiyallah@konstanta.my.id',
@@ -2773,7 +2985,7 @@ BEGIN
 
   -- Jurio Susilo (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2783,6 +2995,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'jurio.susilo@konstanta.my.id',
@@ -2825,7 +3038,7 @@ BEGIN
 
   -- Kartim (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2835,6 +3048,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'kartim@konstanta.my.id',
@@ -2877,7 +3091,7 @@ BEGIN
 
   -- Kelik Adi Trinugroho (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2887,6 +3101,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'kelik.adi.trinugroho@konstanta.my.id',
@@ -2929,7 +3144,7 @@ BEGIN
 
   -- Lidia Rentina Pardede (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2939,6 +3154,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'lidia.rentina.pardede@konstanta.my.id',
@@ -2981,7 +3197,7 @@ BEGIN
 
   -- Lisa Rosaline (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -2991,6 +3207,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'lisa.rosaline@konstanta.my.id',
@@ -3033,7 +3250,7 @@ BEGIN
 
   -- Muarif Ambari (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3043,6 +3260,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'muarif.ambari@konstanta.my.id',
@@ -3085,7 +3303,7 @@ BEGIN
 
   -- M. Tulodo A (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3095,6 +3313,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'm..tulodo.a@konstanta.my.id',
@@ -3137,7 +3356,7 @@ BEGIN
 
   -- Muhammad Arief (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3147,6 +3366,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'muhammad.arief@konstanta.my.id',
@@ -3189,7 +3409,7 @@ BEGIN
 
   -- Mujahidin Faruqul Adzim (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3199,6 +3419,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'mujahidin.faruqul.adzim@konstanta.my.id',
@@ -3241,7 +3462,7 @@ BEGIN
 
   -- Muhammad Faisal Aulia (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3251,6 +3472,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'muhammad.faisal.aulia@konstanta.my.id',
@@ -3293,7 +3515,7 @@ BEGIN
 
   -- Muhamad Ridho (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3303,6 +3525,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'muhamad.ridho@konstanta.my.id',
@@ -3345,7 +3568,7 @@ BEGIN
 
   -- Natasya Adysaphira (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3355,6 +3578,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'natasya.adysaphira@konstanta.my.id',
@@ -3397,7 +3621,7 @@ BEGIN
 
   -- Nyimas Komariah S (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3407,6 +3631,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'nyimas.komariah.s@konstanta.my.id',
@@ -3449,7 +3674,7 @@ BEGIN
 
   -- Pambudi Rahardjo (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3459,6 +3684,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'pambudi.rahardjo@konstanta.my.id',
@@ -3501,7 +3727,7 @@ BEGIN
 
   -- Purnomo (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3511,6 +3737,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'purnomo@konstanta.my.id',
@@ -3553,7 +3780,7 @@ BEGIN
 
   -- Putri Khumaeroh (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3563,6 +3790,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'putri.khumaeroh@konstanta.my.id',
@@ -3605,7 +3833,7 @@ BEGIN
 
   -- Raihana Zahra (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3615,6 +3843,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'raihana.zahra@konstanta.my.id',
@@ -3657,7 +3886,7 @@ BEGIN
 
   -- Rama Akbar Saputra (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3667,6 +3896,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'rama.akbar.saputra@konstanta.my.id',
@@ -3709,7 +3939,7 @@ BEGIN
 
   -- Ramadhan Sagala (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3719,6 +3949,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'ramadhan.sagala@konstanta.my.id',
@@ -3761,7 +3992,7 @@ BEGIN
 
   -- Ratih Novia Pratiwi (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3771,6 +4002,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'ratih.novia.pratiwi@konstanta.my.id',
@@ -3813,7 +4045,7 @@ BEGIN
 
   -- Restu Asegaf (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3823,6 +4055,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'restu.asegaf@konstanta.my.id',
@@ -3865,7 +4098,7 @@ BEGIN
 
   -- Rian Pratama (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3875,6 +4108,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'rian.pratama@konstanta.my.id',
@@ -3917,7 +4151,7 @@ BEGIN
 
   -- Roy Hadiyanto (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3927,6 +4161,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'roy.hadiyanto@konstanta.my.id',
@@ -3969,7 +4204,7 @@ BEGIN
 
   -- Sigit Ramires (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -3979,6 +4214,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'sigit.ramires@konstanta.my.id',
@@ -4021,7 +4257,7 @@ BEGIN
 
   -- Susilawati (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4031,6 +4267,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'susilawati@konstanta.my.id',
@@ -4073,7 +4310,7 @@ BEGIN
 
   -- Taufik Hidayat (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4083,6 +4320,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'taufik.hidayat@konstanta.my.id',
@@ -4125,7 +4363,7 @@ BEGIN
 
   -- Tranggono Setya R (Tio) (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4135,6 +4373,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'tranggono.setya.r@konstanta.my.id',
@@ -4177,7 +4416,7 @@ BEGIN
 
   -- Wahyu (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4187,6 +4426,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'wahyu@konstanta.my.id',
@@ -4229,7 +4469,7 @@ BEGIN
 
   -- Yana (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4239,6 +4479,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'yana@konstanta.my.id',
@@ -4281,7 +4522,7 @@ BEGIN
 
   -- Yasmine (kangguru)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4291,6 +4532,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'yasmine@konstanta.my.id',
@@ -4333,7 +4575,7 @@ BEGIN
 
   -- Sumardi (karyawan)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4343,6 +4585,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'sumardi@konstanta.my.id',
@@ -4385,7 +4628,7 @@ BEGIN
 
   -- Imanoeddin (karyawan)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4395,6 +4638,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'imanoeddin@konstanta.my.id',
@@ -4437,7 +4681,7 @@ BEGIN
 
   -- Ahmad Fatihul Ihsan (karyawan)
   INSERT INTO auth.users (
-    instance_id, aud, role,
+    id, instance_id, aud, role,
     email, encrypted_password,
     email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
@@ -4447,6 +4691,7 @@ BEGIN
     email_change_token_new, email_change
   )
   SELECT
+    gen_random_uuid(),
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated',
     'ahmad.fatihul.ihsan@konstanta.my.id',

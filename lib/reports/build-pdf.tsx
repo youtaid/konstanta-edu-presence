@@ -2,7 +2,7 @@ import React from "react";
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import fs from "fs";
 import path from "path";
-import type { Student, StudentAttendanceSummary, StudentSessionReport } from "@/lib/types";
+import type { EvaluationAssessment, Student, StudentAttendanceSummary, StudentSessionReport } from "@/lib/types";
 
 const TEAL = "#0F766E";
 const COLUMN_WIDTHS = ["15%", "20%", "20%", "12%", "33%"] as const;
@@ -42,8 +42,10 @@ export async function buildStudentReportPdf(
   student: Student,
   reports: StudentSessionReport[],
   summary: StudentAttendanceSummary,
+  evaluations: EvaluationAssessment[] = [],
 ): Promise<Buffer> {
   const sorted = [...reports].sort((a, b) => a.sessionDate.localeCompare(b.sessionDate));
+  const sortedEvaluations = [...evaluations].sort((a, b) => a.assessmentDate.localeCompare(b.assessmentDate));
   const logoPath = path.join(process.cwd(), "public", "logo-konstanta-education.png");
   const hasLogo = fs.existsSync(logoPath);
 
@@ -87,6 +89,38 @@ export async function buildStudentReportPdf(
             Hadir: {summary.hadirCount}   Izin: {summary.izinCount}   Sakit: {summary.sakitCount}   Alpa:{" "}
             {summary.alpaCount}
           </Text>
+        </View>
+
+        <Text style={styles.sectionTitle}>Evaluasi</Text>
+        <View style={styles.table}>
+          <View style={styles.tableRow}>
+            <Text style={[styles.tableHeaderCell, { width: "15%" }]}>Tanggal</Text>
+            <Text style={[styles.tableHeaderCell, { width: "25%" }]}>Asesmen</Text>
+            <Text style={[styles.tableHeaderCell, { width: "20%" }]}>Mata Pelajaran</Text>
+            <Text style={[styles.tableHeaderCell, { width: "12%" }]}>Nilai</Text>
+            <Text style={[styles.tableHeaderCell, { width: "28%" }]}>Feedback</Text>
+          </View>
+          {sortedEvaluations.map((assessment) => {
+            const result = assessment.results[0];
+            const score =
+              result?.score === undefined || result.score === null
+                ? "-"
+                : `${result.score}/${assessment.maxScore || 100}`;
+            return (
+              <View style={styles.tableRow} key={assessment.id}>
+                <Text style={[styles.tableCell, { width: "15%" }]}>{assessment.assessmentDate}</Text>
+                <Text style={[styles.tableCell, { width: "25%" }]}>
+                  {assessment.title} ({assessment.assessmentType})
+                </Text>
+                <Text style={[styles.tableCell, { width: "20%" }]}>{assessment.subject}</Text>
+                <Text style={[styles.tableCell, { width: "12%" }]}>{score}</Text>
+                <Text style={[styles.tableCell, { width: "28%" }]}>{result?.qualitativeFeedback || "-"}</Text>
+              </View>
+            );
+          })}
+          {sortedEvaluations.length === 0 && (
+            <Text style={styles.emptyRow}>Belum ada evaluasi yang dipublish.</Text>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Riwayat Sesi</Text>

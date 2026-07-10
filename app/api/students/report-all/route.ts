@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import JSZip from "jszip";
-import { getStudents, getStudentSessionReports } from "@/app/actions";
+import { getEvaluationResultsForStudent, getStudents, getStudentSessionReports } from "@/app/actions";
 import { computeAttendanceSummary } from "@/lib/attendance";
 import { buildStudentReportDocx } from "@/lib/reports/build-docx";
 import { buildStudentReportPdf } from "@/lib/reports/build-pdf";
@@ -17,12 +17,15 @@ export async function GET(request: NextRequest) {
   const usedNames = new Set<string>();
 
   for (const student of students) {
-    const reports = await getStudentSessionReports(student.id);
+    const [reports, evaluations] = await Promise.all([
+      getStudentSessionReports(student.id),
+      getEvaluationResultsForStudent(student.id),
+    ]);
     const summary = computeAttendanceSummary(student.id, reports);
     const buffer =
       format === "pdf"
-        ? await buildStudentReportPdf(student, reports, summary)
-        : await buildStudentReportDocx(student, reports, summary);
+        ? await buildStudentReportPdf(student, reports, summary, evaluations)
+        : await buildStudentReportDocx(student, reports, summary, evaluations);
 
     let baseName = safeFilename(student.name);
     let filename = `Laporan_${baseName}.${format}`;

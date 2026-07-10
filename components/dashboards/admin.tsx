@@ -14,6 +14,7 @@ import {
 } from "@/app/actions";
 import { Schedule, Period, User } from "@/lib/types";
 import TeacherDataTab from "@/components/dashboards/teacher-data-tab";
+import EvaluationReviewPanel from "@/components/dashboards/evaluation-review-panel";
 import {
   Card,
   CardContent,
@@ -32,6 +33,9 @@ import {
   UserCheck,
   UserX,
   Plus,
+  Printer,
+  FileText,
+  ClipboardCheck,
 } from "lucide-react";
 import { isWithinWorkHours } from "@/lib/honor";
 import type { HonorType } from "@/lib/types";
@@ -50,6 +54,7 @@ export default function AdminDashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);
+  const [evalUsers, setEvalUsers] = useState<User[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [editHonorModal, setEditHonorModal] = useState<{
@@ -59,8 +64,9 @@ export default function AdminDashboard() {
     isTetap: boolean;
     isWajibDetected: boolean;
   } | null>(null);
+  const [selectedSlip, setSelectedSlip] = useState<any | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"ringkasan" | "gaji" | "guru" | "periode">(
+  const [activeTab, setActiveTab] = useState<"ringkasan" | "gaji" | "guru" | "eval" | "reviewEval" | "periode">(
     "ringkasan",
   );
 
@@ -75,6 +81,7 @@ export default function AdminDashboard() {
     setSchedules(allSchedules);
     setPeriods(allPeriods);
     setTeachers(allUsers.filter((u) => u.role === "TEACHER"));
+    setEvalUsers(allUsers.filter((u) => u.role === "EVAL"));
     if (!selectedPeriodId) setSelectedPeriodId(activeP?.id || "");
     setLoading(false);
   }, [selectedPeriodId]);
@@ -181,6 +188,7 @@ export default function AdminDashboard() {
             bpjsKetenagakerjaan: user?.bpjsKetenagakerjaan || 0,
             bpjsKesehatan: user?.bpjsKesehatan || 0,
             dailyWages: {},
+            schedules: [] as Schedule[],
           };
         }
         // For KETetap, honor_type determines how much of honorAmount actually
@@ -208,6 +216,7 @@ export default function AdminDashboard() {
           acc[s.teacherId].dailyWages[s.date] = 0;
         }
         acc[s.teacherId].dailyWages[s.date] += effectiveHonor;
+        acc[s.teacherId].schedules.push(s);
       }
       return acc;
     },
@@ -227,6 +236,7 @@ export default function AdminDashboard() {
         bpjsKetenagakerjaan: number;
         bpjsKesehatan: number;
         dailyWages: Record<string, number>;
+        schedules: Schedule[];
         taxAmount?: number;
         netHonor?: number;
       }
@@ -252,6 +262,7 @@ export default function AdminDashboard() {
           bpjsKetenagakerjaan: t.bpjsKetenagakerjaan || 0,
           bpjsKesehatan: t.bpjsKesehatan || 0,
           dailyWages: {},
+          schedules: [] as Schedule[],
         };
       }
     });
@@ -385,6 +396,18 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab("guru")}
           >
             Data Guru
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "eval" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+            onClick={() => setActiveTab("eval")}
+          >
+            Tim Eval
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "reviewEval" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+            onClick={() => setActiveTab("reviewEval")}
+          >
+            Review Eval
           </button>
           <button
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "periode" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
@@ -747,7 +770,7 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3 text-right font-bold text-teal-700">
                             Rp {(stat.netHonor || 0).toLocaleString("id-ID")}
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-4 py-3 text-center flex justify-center gap-1.5">
                             <Button
                               onClick={() => handlePayAll(stat.id)}
                               size="sm"
@@ -759,6 +782,14 @@ export default function AdminDashboard() {
                               }
                             >
                               Lunas Sesi
+                            </Button>
+                            <Button
+                              onClick={() => setSelectedSlip(stat)}
+                              size="sm"
+                              variant="outline"
+                              className="border-teal-600 text-teal-700 hover:bg-teal-50 flex items-center gap-1"
+                            >
+                              <Printer className="w-3.5 h-3.5" /> Slip
                             </Button>
                           </td>
                         </tr>
@@ -822,7 +853,7 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3 text-right font-bold text-teal-700">
                             Rp {(stat.netHonor || 0).toLocaleString("id-ID")}
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-4 py-3 text-center flex justify-center gap-1.5">
                             <Button
                               onClick={() => handlePayAll(stat.id)}
                               size="sm"
@@ -834,6 +865,14 @@ export default function AdminDashboard() {
                               }
                             >
                               Lunas Sesi
+                            </Button>
+                            <Button
+                              onClick={() => setSelectedSlip(stat)}
+                              size="sm"
+                              variant="outline"
+                              className="border-teal-600 text-teal-700 hover:bg-teal-50 flex items-center gap-1"
+                            >
+                              <Printer className="w-3.5 h-3.5" /> Slip
                             </Button>
                           </td>
                         </tr>
@@ -849,6 +888,12 @@ export default function AdminDashboard() {
       {activeTab === "guru" && (
         <TeacherDataTab teachers={teachers} onTeacherUpdated={loadData} />
       )}
+
+      {activeTab === "eval" && (
+        <EvalAccountTab evalUsers={evalUsers} onEvalCreated={loadData} />
+      )}
+
+      {activeTab === "reviewEval" && <EvaluationReviewPanel />}
 
       {activeTab === "periode" && <PeriodTab onPeriodCreated={loadData} />}
 
@@ -911,6 +956,355 @@ export default function AdminDashboard() {
                 Batal
               </Button>
               <Button onClick={handleUpdateHonor}>Simpan Perubahan</Button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
+
+      {selectedSlip && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto no-print">
+          <Card className="w-full max-w-2xl bg-white shadow-xl flex flex-col max-h-[90vh]">
+            <CardHeader className="border-b shrink-0 flex flex-row justify-between items-center bg-gray-50/50">
+              <div>
+                <CardTitle className="text-teal-800 text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5" /> Slip Gaji Resmi
+                </CardTitle>
+                <p className="text-xs text-gray-500">
+                  Pratinjau slip honorarium guru untuk periode {periods.find((p) => p.id === selectedPeriodId)?.name || "Aktif"}.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedSlip(null)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+              >
+                ✕
+              </button>
+            </CardHeader>
+            <CardContent className="py-6 overflow-y-auto shrink min-h-0 space-y-6">
+              {/* Slip Layout */}
+              <div id="printable-payslip" className="bg-white p-6 border rounded-xl shadow-sm text-gray-800 font-sans space-y-6">
+                <style dangerouslySetInnerHTML={{ __html: `
+                  @media print {
+                    body * {
+                      visibility: hidden !important;
+                    }
+                    #printable-payslip, #printable-payslip * {
+                      visibility: visible !important;
+                    }
+                    #printable-payslip {
+                      position: absolute !important;
+                      left: 0 !important;
+                      top: 0 !important;
+                      width: 100% !important;
+                      background: white !important;
+                      color: black !important;
+                      box-shadow: none !important;
+                      border: none !important;
+                      padding: 0 !important;
+                    }
+                    .no-print {
+                      display: none !important;
+                    }
+                  }
+                `}} />
+
+                {/* Kop Slip */}
+                <div className="flex justify-between items-start border-b pb-4">
+                  <div>
+                    <h1 className="text-xl font-extrabold text-teal-800 tracking-tight">KONSTANTA EDU PRESENCE</h1>
+                    <p className="text-xs text-gray-500">
+                      Ruko Tebet Mas, Jakarta Selatan | Telp: (021) 830-XXXX
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline" className="text-xs font-semibold uppercase tracking-wider text-teal-700">
+                      SLIP GAJI GURU
+                    </Badge>
+                    <p className="text-xs text-gray-500 mt-1">
+                      No: PAY-{selectedSlip.id}-{selectedPeriodId}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Data Karyawan */}
+                <div className="grid grid-cols-2 gap-4 text-xs bg-gray-50 p-3 rounded-lg border">
+                  <div>
+                    <span className="text-gray-400 block uppercase font-medium tracking-wide">Nama Pengajar</span>
+                    <span className="font-bold text-sm text-gray-800">{selectedSlip.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block uppercase font-medium tracking-wide">Tipe Kepegawaian</span>
+                    <span className="font-bold text-sm text-teal-700">
+                      {selectedSlip.teacherType === "TETAP" ? "KETetap (Guru Tetap)" : "KangGuru (Guru Freelance)"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block uppercase font-medium tracking-wide">Periode Gaji</span>
+                    <span className="font-bold text-gray-800">{periods.find((p) => p.id === selectedPeriodId)?.name || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block uppercase font-medium tracking-wide">Tanggal Cetak</span>
+                    <span className="font-bold text-gray-800">{new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+                  </div>
+                </div>
+
+                {/* Perincian Gaji */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold border-b pb-1 text-teal-800">PERINCIAN GAJI & HONORARIUM</h3>
+                  <div className="space-y-2 text-xs">
+                    {/* Fixed Components (Tetap Only) */}
+                    {selectedSlip.teacherType === "TETAP" && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Gaji Pokok</span>
+                          <span className="font-mono font-medium">Rp {(selectedSlip.baseSalary || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Tunjangan Transportasi</span>
+                          <span className="font-mono font-medium">Rp {(selectedSlip.transportAllowance || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Tunjangan Lainnya</span>
+                          <span className="font-mono font-medium">Rp {(selectedSlip.otherAllowance || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div className="flex justify-between text-rose-600">
+                          <span>Potongan BPJS Ketenagakerjaan</span>
+                          <span className="font-mono font-medium">- Rp {(selectedSlip.bpjsKetenagakerjaan || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div className="flex justify-between text-rose-600">
+                          <span>Potongan BPJS Kesehatan</span>
+                          <span className="font-mono font-medium">- Rp {(selectedSlip.bpjsKesehatan || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Variable Components (All) */}
+                    <div className="flex justify-between font-semibold border-t pt-1 mt-1 text-gray-700">
+                      <span>Total Honor Sesi Mengajar ({selectedSlip.sessionCount || 0} Sesi)</span>
+                      <span className="font-mono">Rp {(selectedSlip.totalHonor || 0).toLocaleString("id-ID")}</span>
+                    </div>
+
+                    {/* Tax components (Freelance Only) */}
+                    {selectedSlip.teacherType === "FREELANCE" && (
+                      <div className="flex justify-between text-rose-600 font-semibold">
+                        <span>Potongan Pajak PPh Pasal 21</span>
+                        <span className="font-mono">- Rp {(selectedSlip.taxAmount || 0).toLocaleString("id-ID")}</span>
+                      </div>
+                    )}
+
+                    {/* Grand Net Total */}
+                    <div className="flex justify-between font-extrabold text-teal-800 text-sm border-t border-double pt-2 mt-2">
+                      <span className="uppercase tracking-wide">TOTAL TAKE HOME PAY</span>
+                      <span className="font-mono text-base">Rp {(selectedSlip.netHonor || 0).toLocaleString("id-ID")}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Daftar Sesi */}
+                {selectedSlip.schedules && selectedSlip.schedules.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-bold border-b pb-1 text-teal-800 uppercase tracking-wide">Rincian Sesi Mengajar</h3>
+                    <div className="max-h-[180px] overflow-y-auto pr-1 border rounded-lg">
+                      <table className="w-full text-[10px] text-left">
+                        <thead className="bg-gray-50 text-gray-600 sticky top-0 border-b">
+                          <tr>
+                            <th className="p-2 font-medium">Tanggal</th>
+                            <th className="p-2 font-medium">Sesi (Program/Mata Pelajaran)</th>
+                            <th className="p-2 font-medium">Cabang</th>
+                            <th className="p-2 font-medium text-right">Honor</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {selectedSlip.schedules.map((s: any) => (
+                            <tr key={s.id}>
+                              <td className="p-2 text-gray-500 font-mono">{s.date}</td>
+                              <td className="p-2 text-gray-700 font-medium">
+                                {s.startTime}-{s.endTime} ({s.program} - {s.subject})
+                              </td>
+                              <td className="p-2 text-gray-500">{s.branch}</td>
+                              <td className="p-2 text-gray-700 text-right font-mono font-medium">
+                                Rp {s.honorAmount.toLocaleString("id-ID")}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tanda Tangan */}
+                <div className="grid grid-cols-2 gap-4 text-center text-xs pt-8">
+                  <div>
+                    <p className="text-gray-400 font-medium">Dibuat Oleh,</p>
+                    <div className="h-14"></div>
+                    <p className="font-bold underline text-gray-800">Staf Keuangan</p>
+                    <p className="text-[10px] text-gray-500">Konstanta Edu Presence</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 font-medium">Diterima Oleh,</p>
+                    <div className="h-14"></div>
+                    <p className="font-bold underline text-gray-800">{selectedSlip.name}</p>
+                    <p className="text-[10px] text-gray-500">Penerima Honor</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2 border-t pt-4 bg-gray-50/50 shrink-0">
+              <Button variant="outline" onClick={() => setSelectedSlip(null)}>
+                Tutup
+              </Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-1.5"
+                onClick={() => window.print()}
+              >
+                <Printer className="w-4 h-4" /> Cetak / Unduh PDF
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EvalAccountTab({
+  evalUsers,
+  onEvalCreated,
+}: {
+  evalUsers: User[];
+  onEvalCreated: () => void;
+}) {
+  const [isCreating, setIsCreating] = useState(false);
+  const [formData, setFormData] = useState({ name: "", email: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string;
+    email: string;
+    password: string;
+  } | null>(null);
+
+  const handleCreate = async () => {
+    if (!formData.name || !formData.email) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { createEvalAccount } = await import("@/app/actions");
+      const result = await createEvalAccount(formData);
+      setCreatedCredentials({ name: formData.name, email: result.email, password: result.password });
+      setFormData({ name: "", email: "" });
+      setIsCreating(false);
+      onEvalCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal membuat akun Eval.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button onClick={() => setIsCreating(true)}>
+          <ClipboardCheck className="w-4 h-4 mr-2" /> Tambah Akun Eval
+        </Button>
+      </div>
+
+      {isCreating && (
+        <Card className="bg-teal-50 border-teal-200 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-teal-800">Akun Eval Baru</CardTitle>
+            <p className="text-sm text-teal-700/80">
+              Akun Eval dapat membuat asesmen dan feedback siswa, lalu mengirimkannya ke Akademik/Admin untuk publish.
+            </p>
+          </CardHeader>
+          {error && (
+            <div className="mx-6 mb-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg">
+              {error}
+            </div>
+          )}
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Nama</label>
+              <input
+                className="w-full border rounded-md p-2 text-sm bg-white"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Email</label>
+              <input
+                type="email"
+                className="w-full border rounded-md p-2 text-sm bg-white"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2 border-t border-teal-100 pt-4">
+            <Button variant="outline" onClick={() => setIsCreating(false)}>
+              Batal
+            </Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleCreate} disabled={loading}>
+              Buat Akun Eval
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      <div className="overflow-x-auto bg-white border rounded-xl shadow-sm">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-gray-50 text-gray-700">
+            <tr>
+              <th className="px-4 py-3 font-medium">Nama</th>
+              <th className="px-4 py-3 font-medium">Role</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {evalUsers.map((user) => (
+              <tr key={user.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
+                <td className="px-4 py-3">
+                  <Badge variant="outline">Eval</Badge>
+                </td>
+              </tr>
+            ))}
+            {evalUsers.length === 0 && (
+              <tr>
+                <td colSpan={2} className="px-4 py-8 text-center text-gray-500">
+                  Belum ada akun Eval.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {createdCredentials && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle className="text-teal-800">Akun Eval Dibuat</CardTitle>
+              <p className="text-sm text-gray-500">
+                Bagikan kredensial ini ke {createdCredentials.name}. Password wajib diganti saat login pertama.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Email Login</label>
+                <p className="font-mono text-sm bg-gray-100 rounded-md p-2 mt-1">{createdCredentials.email}</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password Awal</label>
+                <p className="font-mono text-sm bg-gray-100 rounded-md p-2 mt-1">{createdCredentials.password}</p>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-4">
+              <Button className="w-full bg-teal-600 hover:bg-teal-700" onClick={() => setCreatedCredentials(null)}>
+                Tutup
+              </Button>
             </CardFooter>
           </Card>
         </div>

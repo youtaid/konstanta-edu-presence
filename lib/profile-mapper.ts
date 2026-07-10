@@ -9,6 +9,9 @@ export function mapProfileToUser(profile: any, email = ""): User {
   if (profile.role === "admin") roleMapped = "ADMIN";
   else if (profile.role === "akademik") roleMapped = "ACADEMIC";
   else if (profile.role === "ketetap" || profile.role === "kangguru") roleMapped = "TEACHER";
+  else if (profile.role === "eval") roleMapped = "EVAL";
+  else if (profile.role === "otk") roleMapped = "OTK";
+  else if (profile.role === "kenz") roleMapped = "KENZ";
 
   // Staff seeded via SQL only ever get `role` set, not `teacher_type` — fall
   // back to deriving it from role so seeded KETetap/KangGuru are still

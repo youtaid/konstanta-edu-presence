@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'KARYAWAN';
+export type Role = 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'EVAL' | 'KARYAWAN' | 'OTK' | 'KENZ';
 
 export type TeacherType = 'TETAP' | 'FREELANCE';
 
@@ -41,6 +41,7 @@ export type Student = {
   name: string;
   program: string;
   className?: string;
+  hasAccount?: boolean; // derived from students.auth_user_id != null
 };
 
 export type AttendanceStatus = 'Hadir' | 'Izin' | 'Sakit' | 'Alpa';
@@ -63,6 +64,7 @@ export type StudentSessionReport = {
   sessionDate: string;
   attendance: AttendanceStatus;
   progressNote: string;
+  score?: number | null; // nilai KBM, Privat/ELC saja (nullable untuk program lain)
   createdAt: string;
 };
 
@@ -110,21 +112,81 @@ export type Schedule = {
     materialTaught: string;
     understandingLevel: string;
     studentActivity: string;
+    revisionNote?: string;
     studentProgresses?: {
       studentId: string;
       studentName: string;
       attendance: string;
       progress: string;
+      score?: number | null;
     }[];
   };
   checkIn?: {
     time: string;
     lat: number;
     lng: number;
+    gpsBypassed?: boolean;
+    distance?: number;
   };
   checkOut?: {
     time: string;
     lat: number;
     lng: number;
+    gpsBypassed?: boolean;
+    distance?: number;
   };
+};
+
+export type ParentLink = {
+  id: string;
+  parentId: string;
+  parentName: string;
+  studentId: string;
+  relationship?: string;
+};
+
+export type EvaluationStatus = 'DRAFT' | 'SUBMITTED' | 'REJECTED' | 'PUBLISHED';
+
+export type EvaluationType = 'KUIS' | 'TO' | 'TUGAS' | 'LAINNYA';
+
+export type EvaluationResult = {
+  id: string;
+  assessmentId: string;
+  studentId: string;
+  studentName?: string;
+  score?: number | null;
+  qualitativeFeedback: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EvaluationTeacherRecipient = {
+  id: string;
+  assessmentId: string;
+  teacherProfileId: string;
+  teacherId: string;
+  teacherName: string;
+  createdAt: string;
+};
+
+export type EvaluationAssessment = {
+  id: string;
+  title: string;
+  assessmentType: EvaluationType;
+  subject: string;
+  program?: string;
+  className?: string;
+  assessmentDate: string;
+  maxScore?: number | null;
+  description?: string;
+  status: EvaluationStatus;
+  createdBy: string;
+  createdByName?: string;
+  reviewNote?: string;
+  publishedBy?: string;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  results: EvaluationResult[];
+  teacherRecipients: EvaluationTeacherRecipient[];
 };

@@ -14,7 +14,7 @@ import {
 } from "docx";
 import fs from "fs";
 import path from "path";
-import type { Student, StudentAttendanceSummary, StudentSessionReport } from "@/lib/types";
+import type { EvaluationAssessment, Student, StudentAttendanceSummary, StudentSessionReport } from "@/lib/types";
 
 const TEAL = "0F766E";
 const COLUMN_WIDTHS = [15, 20, 20, 12, 33]; // percent, sums to 100
@@ -92,12 +92,63 @@ function historyTable(reports: StudentSessionReport[]) {
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] });
 }
 
+function evaluationTable(evaluations: EvaluationAssessment[]) {
+  const headerRow = new TableRow({
+    tableHeader: true,
+    children: [
+      headerCell("Tanggal", 15),
+      headerCell("Asesmen", 25),
+      headerCell("Mata Pelajaran", 20),
+      headerCell("Nilai", 12),
+      headerCell("Feedback", 28),
+    ],
+  });
+
+  if (evaluations.length === 0) {
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        headerRow,
+        new TableRow({
+          children: [
+            new TableCell({
+              columnSpan: 5,
+              children: [new Paragraph("Belum ada evaluasi yang dipublish.")],
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  const rows = evaluations.map((assessment) => {
+    const result = assessment.results[0];
+    const score =
+      result?.score === undefined || result.score === null
+        ? "-"
+        : `${result.score}/${assessment.maxScore || 100}`;
+    return new TableRow({
+      children: [
+        bodyCell(assessment.assessmentDate, 15),
+        bodyCell(`${assessment.title} (${assessment.assessmentType})`, 25),
+        bodyCell(assessment.subject, 20),
+        bodyCell(score, 12),
+        bodyCell(result?.qualitativeFeedback || "-", 28),
+      ],
+    });
+  });
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] });
+}
+
 export async function buildStudentReportDocx(
   student: Student,
   reports: StudentSessionReport[],
   summary: StudentAttendanceSummary,
+  evaluations: EvaluationAssessment[] = [],
 ): Promise<Buffer> {
   const sorted = [...reports].sort((a, b) => a.sessionDate.localeCompare(b.sessionDate));
+  const sortedEvaluations = [...evaluations].sort((a, b) => a.assessmentDate.localeCompare(b.assessmentDate));
   const logoPath = path.join(process.cwd(), "public", "logo-konstanta-education.png");
   const logoBuffer = fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
 
@@ -142,13 +193,19 @@ export async function buildStudentReportDocx(
       text: `Hadir: ${summary.hadirCount}   Izin: ${summary.izinCount}   Sakit: ${summary.sakitCount}   Alpa: ${summary.alpaCount}`,
     }),
     new Paragraph({ text: "" }),
-    new Paragraph({ text: "Riwayat Sesi", heading: HeadingLevel.HEADING_2 }),
+    new Paragraph({ text: "Evaluasi", heading: HeadingLevel.HEADING_2 }),
   );
 
   const doc = new Document({
     sections: [
       {
-        children: [...children, historyTable(sorted)],
+        children: [
+          ...children,
+          evaluationTable(sortedEvaluations),
+          new Paragraph({ text: "" }),
+          new Paragraph({ text: "Riwayat Sesi", heading: HeadingLevel.HEADING_2 }),
+          historyTable(sorted),
+        ],
       },
     ],
   });
