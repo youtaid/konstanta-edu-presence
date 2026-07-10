@@ -11,9 +11,6 @@ interface AnimatedLetterTextProps {
 }
 
 export function AnimatedLetterText({ text = "Portfolio", letterToReplace = "o", className }: AnimatedLetterTextProps) {
-  const parts: React.ReactNode[] = []
-  let keyIndex = 0
-
   const lowerText = text.toLowerCase()
   const lowerLetter = letterToReplace.toLowerCase()
   const replaceIndex = lowerText.indexOf(lowerLetter)
@@ -22,15 +19,17 @@ export function AnimatedLetterText({ text = "Portfolio", letterToReplace = "o", 
     return <span className={cn("font-black tracking-tight text-foreground", className)}>{text}</span>
   }
 
-  const before = text.slice(0, replaceIndex)
-  const after = text.slice(replaceIndex + 1)
+  const before = text.slice(0, replaceIndex).split("")
+  const after = text.slice(replaceIndex + 1).split("")
 
   return (
-    <span className={cn("inline-flex items-center font-black tracking-tight text-foreground", className)}>
-      {before && <span key={keyIndex++}>{before}</span>}
+    <span className={cn("inline-flex items-center justify-center gap-[1em] font-black text-foreground", className)}>
+      {before.map((char, i) => (
+        <span key={`before-${i}`}>{char}</span>
+      ))}
 
       <span
-        className="relative inline-flex items-center justify-center mx-[-0.02em]"
+        className="relative inline-flex items-center justify-center"
         style={{
           filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25)) drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
         }}
@@ -128,7 +127,9 @@ export function AnimatedLetterText({ text = "Portfolio", letterToReplace = "o", 
         </span>
       </span>
 
-      {after && <span key={keyIndex++}>{after}</span>}
+      {after.map((char, i) => (
+        <span key={`after-${i}`}>{char}</span>
+      ))}
     </span>
   )
 }

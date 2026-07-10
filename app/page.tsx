@@ -43,15 +43,15 @@ const PTN_LOGOS: {
   delay: number;
 }[] = [
   { src: "/Logo%20PTN/Logo%20UGM.png", alt: "UGM", top: "1%", left: "53%", size: 72, rotate: -4, delay: 0 },
-  { src: "/Logo%20PTN/Logo%20ITB.png", alt: "ITB", top: "28%", left: "10%", size: 68, rotate: 5, delay: 0.3 },
-  { src: "/Logo%20PTN/Logo%20UNS%20clean.png", alt: "UNS", top: "37%", left: "21%", size: 58, rotate: -6, delay: 0.6 },
-  { src: "/Logo%20PTN/Logo%20UB%20clean.png", alt: "UB", top: "44%", left: "4%", size: 54, rotate: 4, delay: 0.9 },
+  { src: "/Logo%20PTN/Logo%20ITB.png", alt: "ITB", top: "28%", left: "10%", size: 72, rotate: 5, delay: 0.3 },
+  { src: "/Logo%20PTN/Logo%20UNS%20clean.png", alt: "UNS", top: "37%", left: "21%", size: 72, rotate: -6, delay: 0.6 },
+  { src: "/Logo%20PTN/Logo%20UB%20clean.png", alt: "UB", top: "44%", left: "4%", size: 72, rotate: 4, delay: 0.9 },
   { src: "/Logo%20PTN/Logo%20UI.png", alt: "UI", top: "31%", left: "74%", size: 72, rotate: 6, delay: 0.2 },
-  { src: "/Logo%20PTN/Logo%20UNDIP.png", alt: "UNDIP", top: "55%", left: "82%", size: 58, rotate: -5, delay: 0.5 },
-  { src: "/Logo%20PTN/Logo%20UNAIR.png", alt: "UNAIR", top: "64%", left: "72%", size: 54, rotate: 5, delay: 0.8 },
-  { src: "/Logo%20PTN/Logo%20IPB.png", alt: "IPB", top: "73%", left: "80%", size: 58, rotate: -3, delay: 1.1 },
-  { src: "/Logo%20PTN/Logo%20UNPAD%20clean.png", alt: "UNPAD", top: "78%", left: "10%", size: 56, rotate: 4, delay: 0.4 },
-  { src: "/Logo%20PTN/Logo%20ITS.png", alt: "ITS", top: "89%", left: "46%", size: 60, rotate: -4, delay: 0.7 },
+  { src: "/Logo%20PTN/Logo%20UNDIP.png", alt: "UNDIP", top: "55%", left: "82%", size: 72, rotate: -5, delay: 0.5 },
+  { src: "/Logo%20PTN/Logo%20UNAIR.png", alt: "UNAIR", top: "64%", left: "72%", size: 72, rotate: 5, delay: 0.8 },
+  { src: "/Logo%20PTN/Logo%20IPB.png", alt: "IPB", top: "73%", left: "80%", size: 72, rotate: -3, delay: 1.1 },
+  { src: "/Logo%20PTN/Logo%20UNPAD%20clean.png", alt: "UNPAD", top: "78%", left: "10%", size: 72, rotate: 4, delay: 0.4 },
+  { src: "/Logo%20PTN/Logo%20ITS.png", alt: "ITS", top: "89%", left: "46%", size: 72, rotate: -4, delay: 0.7 },
 ];
 
 function PTNShowcase() {
@@ -61,17 +61,34 @@ function PTNShowcase() {
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[330px] h-[330px] rounded-full border border-teal-200/40"></div>
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] rounded-full border border-teal-200/50"></div>
 
-      {PTN_LOGOS.map((logo) => (
-        <motion.div
-          key={logo.alt}
-          className="absolute rounded-2xl bg-white shadow-lg shadow-teal-900/5 border border-gray-100 p-2 flex items-center justify-center"
-          style={{ top: logo.top, left: logo.left, width: logo.size, height: logo.size, rotate: logo.rotate }}
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: logo.delay }}
-        >
-          <img src={logo.src} alt={logo.alt} className="w-full h-full object-contain" />
-        </motion.div>
-      ))}
+      <motion.div
+        className="absolute inset-0"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+      >
+        {PTN_LOGOS.map((logo) => (
+          <div
+            key={logo.alt}
+            className="absolute"
+            style={{ top: logo.top, left: logo.left, width: logo.size, height: logo.size }}
+          >
+            <motion.div
+              className="w-full h-full"
+              animate={{ rotate: -360 }}
+              transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+            >
+              <motion.div
+                className="w-full h-full rounded-2xl bg-white shadow-lg shadow-teal-900/5 border border-gray-100 p-2 flex items-center justify-center"
+                style={{ rotate: logo.rotate }}
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: logo.delay }}
+              >
+                <img src={logo.src} alt={logo.alt} className="w-full h-full object-contain" />
+              </motion.div>
+            </motion.div>
+          </div>
+        ))}
+      </motion.div>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-12 z-10 pointer-events-none">
         <span className="text-xs font-bold tracking-[0.25em] text-teal-600 uppercase mb-3">
@@ -215,7 +232,7 @@ export default function Home() {
           color="#0d9488"
         />
 
-        <div className="w-full relative z-10 grid lg:grid-cols-[2fr_3fr] gap-8 items-stretch">
+        <div className="w-full relative z-10 grid lg:grid-cols-[3fr_2fr] gap-8 items-stretch">
         <PTNShowcase />
         <div className="w-full h-full flex flex-col justify-center bg-white/90 backdrop-blur-xl p-8 lg:p-10 rounded-[28px] shadow-[0_24px_60px_-15px_rgba(13,148,136,0.15)] border border-white">
           <div className="text-center pb-6">
@@ -227,7 +244,7 @@ export default function Home() {
             <AnimatedLetterText
               text="KEMON"
               letterToReplace="O"
-              className="text-4xl mt-4 justify-center tracking-[1em] text-teal-800"
+              className="text-4xl mt-4 justify-center text-teal-800"
             />
             <p className="text-sm text-gray-500 mt-1.5">
               Konstanta Education Monitoring & Evaluation
