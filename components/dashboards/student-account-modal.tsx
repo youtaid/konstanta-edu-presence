@@ -22,6 +22,14 @@ export default function StudentAccountModal({
     email: string;
     password: string;
   } | null>(null);
+  const [wasCreated, setWasCreated] = useState(false);
+
+  const handleClose = () => {
+    if (wasCreated) {
+      onAccountCreated();
+    }
+    onClose();
+  };
 
   const handleCreate = async () => {
     setActionLoading(true);
@@ -33,7 +41,7 @@ export default function StudentAccountModal({
         return;
       }
       setCreatedCredentials({ email: result.email!, password: result.password! });
-      onAccountCreated();
+      setWasCreated(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal membuat akun siswa.");
     } finally {
@@ -47,7 +55,7 @@ export default function StudentAccountModal({
         <CardHeader className="shrink-0">
           <div className="flex items-start justify-between">
             <CardTitle>Kelola Akun Siswa — {student.name}</CardTitle>
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <Button variant="outline" size="sm" onClick={handleClose}>
               <X className="w-4 h-4" />
             </Button>
           </div>
@@ -84,7 +92,7 @@ export default function StudentAccountModal({
               </div>
               <Button
                 className="w-full bg-teal-600 hover:bg-teal-700"
-                onClick={onClose}
+                onClick={handleClose}
               >
                 Tutup
               </Button>
@@ -124,7 +132,7 @@ export default function StudentAccountModal({
           )}
         </CardContent>
         <CardFooter className="border-t pt-4 shrink-0">
-          <Button variant="outline" className="w-full" onClick={onClose}>
+          <Button variant="outline" className="w-full" onClick={handleClose}>
             Tutup
           </Button>
         </CardFooter>
