@@ -28,7 +28,11 @@ export default function StudentAccountModal({
     setError(null);
     try {
       const result = await createStudentAccount(student.id);
-      setCreatedCredentials({ email: result.email, password: result.password });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setCreatedCredentials({ email: result.email!, password: result.password! });
       onAccountCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal membuat akun siswa.");

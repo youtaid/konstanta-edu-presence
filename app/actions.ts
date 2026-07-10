@@ -812,74 +812,84 @@ export async function createEvalAccount(data: { name: string; email: string }) {
 }
 
 // Creates a KEnz (student) login for an existing students row.
-export async function createStudentAccount(studentId: string) {
-  await requireStaffCaller();
-  const admin = createAdminClient();
-  const { data: student, error: studentErr } = await admin
-    .from("students").select("*").eq("id", studentId).single();
-  if (studentErr || !student) throw new Error("Siswa tidak ditemukan.");
-  if (student.auth_user_id) throw new Error("Siswa ini sudah memiliki akun login.");
+export async function createStudentAccount(studentId: string): Promise<{ email?: string; password?: string; error?: string }> {
+  try {
+    await requireStaffCaller();
+    const admin = createAdminClient();
+    const { data: student, error: studentErr } = await admin
+      .from("students").select("*").eq("id", studentId).single();
+    if (studentErr || !student) throw new Error("Siswa tidak ditemukan.");
+    if (student.auth_user_id) throw new Error("Siswa ini sudah memiliki akun login.");
 
-  const password = generateInitialPassword();
-  const { email, user } = await createAuthUserWithUniqueEmail(
-    admin, student.name, password,
-    { provider: "email", providers: ["email"], role: "kenz", roles: ["kenz"] },
-    { full_name: student.name },
-  );
+    const password = generateInitialPassword();
+    const { email, user } = await createAuthUserWithUniqueEmail(
+      admin, student.name, password,
+      { provider: "email", providers: ["email"], role: "kenz", roles: ["kenz"] },
+      { full_name: student.name },
+    );
 
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: user.id, role: "kenz", full_name: student.name, must_change_password: true,
-  });
-  if (profileError) {
-    await admin.auth.admin.deleteUser(user.id);
-    throw new Error(profileError.message);
+    const { error: profileError } = await admin.from("profiles").insert({
+      id: user.id, role: "kenz", full_name: student.name, must_change_password: true,
+    });
+    if (profileError) {
+      await admin.auth.admin.deleteUser(user.id);
+      throw new Error(profileError.message);
+    }
+
+    const { error: linkError } = await admin.from("students")
+      .update({ auth_user_id: user.id }).eq("id", studentId);
+    if (linkError) {
+      await admin.from("profiles").delete().eq("id", user.id);
+      await admin.auth.admin.deleteUser(user.id);
+      throw new Error(linkError.message);
+    }
+
+    revalidatePath("/");
+    return { email, password };
+  } catch (err: any) {
+    console.error("Error in createStudentAccount:", err);
+    return { error: err instanceof Error ? err.message : String(err) };
   }
-
-  const { error: linkError } = await admin.from("students")
-    .update({ auth_user_id: user.id }).eq("id", studentId);
-  if (linkError) {
-    await admin.from("profiles").delete().eq("id", user.id);
-    await admin.auth.admin.deleteUser(user.id);
-    throw new Error(linkError.message);
-  }
-
-  revalidatePath("/");
-  return { email, password };
 }
 
 // Creates a new OTK (parent) login and links it to one or more students.
-export async function createParentAccount(data: { name: string; studentIds: string[] }) {
-  await requireStaffCaller();
-  if (!data.name) throw new Error("Nama orang tua wajib diisi.");
-  if (!data.studentIds?.length) throw new Error("Pilih minimal satu siswa untuk dihubungkan.");
+export async function createParentAccount(data: { name: string; studentIds: string[] }): Promise<{ email?: string; password?: string; error?: string }> {
+  try {
+    await requireStaffCaller();
+    if (!data.name) throw new Error("Nama orang tua wajib diisi.");
+    if (!data.studentIds?.length) throw new Error("Pilih minimal satu siswa untuk dihubungkan.");
 
-  const admin = createAdminClient();
-  const password = generateInitialPassword();
-  const { email, user } = await createAuthUserWithUniqueEmail(
-    admin, data.name, password,
-    { provider: "email", providers: ["email"], role: "otk", roles: ["otk"] },
-    { full_name: data.name },
-  );
+    const admin = createAdminClient();
+    const password = generateInitialPassword();
+    const { email, user } = await createAuthUserWithUniqueEmail(
+      admin, data.name, password,
+      { provider: "email", providers: ["email"], role: "otk", roles: ["otk"] },
+      { full_name: data.name },
+    );
 
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: user.id, role: "otk", full_name: data.name, must_change_password: true,
-  });
-  if (profileError) {
-    await admin.auth.admin.deleteUser(user.id);
-    throw new Error(profileError.message);
+    const { error: profileError } = await admin.from("profiles").insert({
+      id: user.id, role: "otk", full_name: data.name, must_change_password: true,
+    });
+    if (profileError) {
+      await admin.auth.admin.deleteUser(user.id);
+      throw new Error(profileError.message);
+    }
+
+    const { error: linkError } = await admin.from("parent_student_links").insert(
+      data.studentIds.map((sid) => ({ id: `${user.id}_${sid}`, parent_id: user.id, student_id: sid })),
+    );
+    if (linkError) {
+      await admin.from("profiles").delete().eq("id", user.id);
+      await admin.auth.admin.deleteUser(user.id);
+      throw new Error(linkError.message);
+    }
+
+    revalidatePath("/");
+    return { email, password };
+  } catch (err: any) {
+    console.error("Error in createParentAccount:", err);
+    return { error: err instanceof Error ? err.message : String(err) };
   }
-
-  const { error: linkError } = await admin.from("parent_student_links").insert(
-    data.studentIds.map((sid) => ({ id: `${user.id}_${sid}`, parent_id: user.id, student_id: sid })),
-  );
-  if (linkError) {
-    await admin.from("profiles").delete().eq("id", user.id);
-    await admin.auth.admin.deleteUser(user.id);
-    throw new Error(linkError.message);
-  }
-
-  revalidatePath("/");
-  return { email, password };
 }
 
 // Links an already-existing OTK account to another child (second sibling case).

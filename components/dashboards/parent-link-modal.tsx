@@ -88,7 +88,11 @@ export default function ParentLinkModal({
         name: newParentName,
         studentIds: [student.id],
       });
-      setCreatedCredentials({ name: newParentName, email: result.email, password: result.password });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setCreatedCredentials({ name: newParentName, email: result.email!, password: result.password! });
       setNewParentName("");
       await refresh();
     } catch (err) {
