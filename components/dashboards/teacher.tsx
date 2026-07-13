@@ -38,6 +38,15 @@ const BRANCH_COORDINATES: Record<string, { lat: number; lng: number }> = {
   "Bekasi": { lat: -6.2349, lng: 106.9896 },
 };
 
+type TeacherTab = "jadwal" | "rekap" | "feedback" | "gaji";
+
+const TEACHER_TABS: { id: TeacherTab; label: string }[] = [
+  { id: "jadwal", label: "Jadwal Mengajar" },
+  { id: "rekap", label: "Rekap Mengajar" },
+  { id: "feedback", label: "Feedback Eval" },
+  { id: "gaji", label: "Gaji Periode" },
+];
+
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3; // Earth radius in meters
   const phi1 = (lat1 * Math.PI) / 180;
@@ -87,9 +96,7 @@ export default function TeacherDashboard() {
     }[],
   });
 
-  const [activeTab, setActiveTab] = useState<"jadwal" | "rekap" | "feedback" | "gaji">(
-    "jadwal",
-  );
+  const [activeTab, setActiveTab] = useState<TeacherTab>("jadwal");
 
   const loadSchedules = useCallback(async () => {
     const [all, allPeriods, activeP, teacherEval] = await Promise.all([
@@ -116,14 +123,18 @@ export default function TeacherDashboard() {
     loadSchedules();
   };
 
+  const finishCheckIn = async (id: string, lat: number, lng: number, bypass: boolean, distance: number) => {
+    await checkIn(id, lat, lng, bypass, distance);
+    loadSchedules();
+  };
+
   const handleCheckIn = async (id: string) => {
     const schedule = schedules.find((s) => s.id === id);
     if (!schedule) return;
 
     if (!navigator.geolocation) {
       alert("Browser Anda tidak mendukung layanan lokasi (Geolocation). Menggunakan bypass GPS.");
-      await checkIn(id, -6.2301, 106.8501, true, 0);
-      loadSchedules();
+      await finishCheckIn(id, -6.2301, 106.8501, true, 0);
       return;
     }
 
@@ -134,8 +145,7 @@ export default function TeacherDashboard() {
 
         if (schedule.classMode === "ONLINE") {
           // No geofencing needed for online mode
-          await checkIn(id, lat, lng, false, 0);
-          loadSchedules();
+          await finishCheckIn(id, lat, lng, false, 0);
           return;
         }
 
@@ -152,8 +162,7 @@ export default function TeacherDashboard() {
             lng,
           });
         } else {
-          await checkIn(id, lat, lng, false, Math.round(distance));
-          loadSchedules();
+          await finishCheckIn(id, lat, lng, false, Math.round(distance));
         }
       },
       async (error) => {
@@ -283,30 +292,15 @@ export default function TeacherDashboard() {
           </p>
         </div>
         <div className="flex bg-gray-100/50 p-1 rounded-xl border border-gray-200">
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "jadwal" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("jadwal")}
-          >
-            Jadwal Mengajar
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "rekap" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("rekap")}
-          >
-            Rekap Mengajar
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "feedback" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("feedback")}
-          >
-            Feedback Eval
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "gaji" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("gaji")}
-          >
-            Gaji Periode
-          </button>
+          {TEACHER_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -842,9 +836,8 @@ export default function TeacherDashboard() {
               <Button
                 className="bg-amber-600 hover:bg-amber-700 text-white"
                 onClick={async () => {
-                  await checkIn(gpsModal.scheduleId, gpsModal.lat, gpsModal.lng, true, gpsModal.distance);
+                  await finishCheckIn(gpsModal.scheduleId, gpsModal.lat, gpsModal.lng, true, gpsModal.distance);
                   setGpsModal(null);
-                  loadSchedules();
                 }}
               >
                 Tetap Check-In (Bypass GPS)

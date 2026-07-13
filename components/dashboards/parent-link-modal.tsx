@@ -53,43 +53,37 @@ export default function ParentLinkModal({
   const linkedParentIds = new Set(links.map((l) => l.parentId));
   const availableParents = parentAccounts.filter((p) => !linkedParentIds.has(p.id));
 
-  const handleUnlink = async (parentId: string) => {
+  const runAction = useCallback(async (action: () => Promise<void>, fallbackError: string) => {
     setActionLoading(true);
     setError(null);
     try {
-      await unlinkParentFromStudent(parentId, student.id);
-      await refresh();
+      await action();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memutus hubungan.");
+      setError(err instanceof Error ? err.message : fallbackError);
     } finally {
       setActionLoading(false);
     }
-  };
+  }, []);
 
-  const handleLinkExisting = async () => {
+  const handleUnlink = (parentId: string) =>
+    runAction(async () => {
+      await unlinkParentFromStudent(parentId, student.id);
+      await refresh();
+    }, "Gagal memutus hubungan.");
+
+  const handleLinkExisting = () => {
     if (!selectedExistingParentId) return;
-    setActionLoading(true);
-    setError(null);
-    try {
+    return runAction(async () => {
       await linkParentToStudent(selectedExistingParentId, student.id);
       setSelectedExistingParentId("");
       await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal menghubungkan orang tua.");
-    } finally {
-      setActionLoading(false);
-    }
+    }, "Gagal menghubungkan orang tua.");
   };
 
-  const handleCreateNew = async () => {
+  const handleCreateNew = () => {
     if (!newParentName) return;
-    setActionLoading(true);
-    setError(null);
-    try {
-      const result = await createParentAccount({
-        name: newParentName,
-        studentIds: [student.id],
-      });
+    return runAction(async () => {
+      const result = await createParentAccount({ name: newParentName, studentIds: [student.id] });
       if (result.error) {
         setError(result.error);
         return;
@@ -97,33 +91,19 @@ export default function ParentLinkModal({
       setCreatedCredentials({ name: newParentName, email: result.email!, password: result.password! });
       setNewParentName("");
       await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal membuat akun orang tua.");
-    } finally {
-      setActionLoading(false);
-    }
+    }, "Gagal membuat akun orang tua.");
   };
 
-  const handleResetPassword = async (parentId: string, parentName: string) => {
+  const handleResetPassword = (parentId: string, parentName: string) => {
     if (!confirm(`Reset password untuk orang tua ${parentName}?`)) return;
-    setActionLoading(true);
-    setError(null);
-    try {
+    return runAction(async () => {
       const result = await resetParentPassword(parentId);
       if (result.error) {
         setError(result.error);
         return;
       }
-      setCreatedCredentials({
-        name: parentName,
-        email: result.email!,
-        password: result.password!,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal mereset password orang tua.");
-    } finally {
-      setActionLoading(false);
-    }
+      setCreatedCredentials({ name: parentName, email: result.email!, password: result.password! });
+    }, "Gagal mereset password orang tua.");
   };
 
   return (

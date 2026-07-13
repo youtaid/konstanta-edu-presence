@@ -31,11 +31,14 @@ export default function StudentAccountModal({
     onClose();
   };
 
-  const handleCreate = async () => {
+  const runCredentialAction = async (
+    action: () => Promise<{ email?: string; password?: string; error?: string }>,
+    fallbackError: string,
+  ) => {
     setActionLoading(true);
     setError(null);
     try {
-      const result = await createStudentAccount(student.id);
+      const result = await action();
       if (result.error) {
         setError(result.error);
         return;
@@ -43,29 +46,21 @@ export default function StudentAccountModal({
       setCreatedCredentials({ email: result.email!, password: result.password! });
       setWasCreated(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal membuat akun siswa.");
+      setError(err instanceof Error ? err.message : fallbackError);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleCreate = () =>
+    runCredentialAction(() => createStudentAccount(student.id), "Gagal membuat akun siswa.");
+
+  const handleResetPassword = () => {
     if (!confirm(`Reset password untuk siswa ${student.name}?`)) return;
-    setActionLoading(true);
-    setError(null);
-    try {
-      const result = await resetStudentPassword(student.id);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setCreatedCredentials({ email: result.email!, password: result.password! });
-      setWasCreated(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal mereset password siswa.");
-    } finally {
-      setActionLoading(false);
-    }
+    return runCredentialAction(
+      () => resetStudentPassword(student.id),
+      "Gagal mereset password siswa.",
+    );
   };
 
   return (

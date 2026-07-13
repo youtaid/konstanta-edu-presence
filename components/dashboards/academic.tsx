@@ -86,6 +86,15 @@ const SUBJECTS = [
   "Sosiologi",
 ];
 
+type AcademicTab = "jadwal" | "siswa" | "guru" | "eval";
+
+const ACADEMIC_TABS: { id: AcademicTab; label: string }[] = [
+  { id: "jadwal", label: "Jadwal KBM" },
+  { id: "siswa", label: "Data Siswa" },
+  { id: "guru", label: "Data Guru" },
+  { id: "eval", label: "Review Eval" },
+];
+
 export default function AcademicDashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);
@@ -93,9 +102,7 @@ export default function AcademicDashboard() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<"jadwal" | "siswa" | "guru" | "eval">(
-    "jadwal",
-  );
+  const [activeTab, setActiveTab] = useState<AcademicTab>("jadwal");
   const [scheduleViewMode, setScheduleViewMode] = useState<"calendar" | "list">("calendar");
 
   const [isCreating, setIsCreating] = useState(false);
@@ -302,8 +309,8 @@ export default function AcademicDashboard() {
       await setSchedulesArchived(Array.from(selectedIds), archived);
       setSelectedIds(new Set());
       await loadData();
-    } catch (err: any) {
-      alert(err.message || "Gagal mengarsipkan jadwal");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal mengarsipkan jadwal");
     }
     setIsArchiving(false);
   };
@@ -358,8 +365,8 @@ export default function AcademicDashboard() {
         setSelectedIds(new Set());
       }
       await loadData();
-    } catch (err: any) {
-      alert(err.message || "Gagal menghapus jadwal");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal menghapus jadwal");
     }
     setIsDeleting(false);
     setDeleteConfirm(null);
@@ -371,8 +378,8 @@ export default function AcademicDashboard() {
       await updateSchedule(editModal.schedule.id, editModal.form);
       setEditModal(null);
       await loadData();
-    } catch (err: any) {
-      alert(err.message || "Gagal mengupdate jadwal");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal mengupdate jadwal");
     }
   };
 
@@ -392,30 +399,15 @@ export default function AcademicDashboard() {
           </p>
         </div>
         <div className="flex bg-gray-100/50 p-1 rounded-xl border border-gray-200">
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "jadwal" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("jadwal")}
-          >
-            Jadwal KBM
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "siswa" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("siswa")}
-          >
-            Data Siswa
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "guru" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("guru")}
-          >
-            Data Guru
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "eval" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("eval")}
-          >
-            Review Eval
-          </button>
+          {ACADEMIC_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 

@@ -165,9 +165,13 @@ export default function EvalDashboard() {
         maxScore: form.maxScore === "" ? null : Number(form.maxScore),
         description: form.description.trim() || undefined,
       };
-      const assessmentId = selectedAssessment
-        ? (await updateEvaluationAssessment(selectedAssessment.id, payload), selectedAssessment.id)
-        : await createEvaluationAssessment(payload);
+      let assessmentId: string;
+      if (selectedAssessment) {
+        await updateEvaluationAssessment(selectedAssessment.id, payload);
+        assessmentId = selectedAssessment.id;
+      } else {
+        assessmentId = await createEvaluationAssessment(payload);
+      }
 
       const selectedTeachers = teachers
         .filter((teacher) => selectedTeacherIds.has(teacher.id))

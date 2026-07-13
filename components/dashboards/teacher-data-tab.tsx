@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { User } from "@/lib/types";
+import { createTeacher, deleteTeacher, updateTeacher } from "@/app/actions";
+import { TeacherType, User } from "@/lib/types";
 import {
   Card,
   CardContent,
@@ -13,8 +14,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 
-export default 
-function TeacherDataTab({
+const EMPTY_TEACHER_FORM: Partial<User> = {
+  name: "",
+  email: "",
+  teacherType: "FREELANCE",
+  baseSalary: 0,
+  transportAllowance: 0,
+  otherAllowance: 0,
+  bpjsKetenagakerjaan: 0,
+  bpjsKesehatan: 0,
+  workStartTime: "08:00",
+  workEndTime: "16:00",
+};
+
+export default function TeacherDataTab({
   teachers,
   onTeacherUpdated,
 }: {
@@ -23,18 +36,7 @@ function TeacherDataTab({
 }) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<User>>({
-    name: "",
-    email: "",
-    teacherType: "FREELANCE",
-    baseSalary: 0,
-    transportAllowance: 0,
-    otherAllowance: 0,
-    bpjsKetenagakerjaan: 0,
-    bpjsKesehatan: 0,
-    workStartTime: "08:00",
-    workEndTime: "16:00",
-  });
+  const [formData, setFormData] = useState<Partial<User>>(EMPTY_TEACHER_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -47,18 +49,7 @@ function TeacherDataTab({
   const [filterType, setFilterType] = useState("ALL");
 
   const resetForm = () => {
-    setFormData({
-      name: "",
-      email: "",
-      teacherType: "FREELANCE",
-      baseSalary: 0,
-      transportAllowance: 0,
-      otherAllowance: 0,
-      bpjsKetenagakerjaan: 0,
-      bpjsKesehatan: 0,
-      workStartTime: "08:00",
-      workEndTime: "16:00",
-    });
+    setFormData(EMPTY_TEACHER_FORM);
     setError(null);
     setIsCreating(false);
     setEditingId(null);
@@ -83,7 +74,6 @@ function TeacherDataTab({
 
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus data guru?")) return;
-    const { deleteTeacher } = await import("@/app/actions");
     await deleteTeacher(id);
     onTeacherUpdated();
   };
@@ -92,7 +82,6 @@ function TeacherDataTab({
     if (!formData.name || (!editingId && !formData.email)) return;
     setLoading(true);
     setError(null);
-    const { createTeacher, updateTeacher } = await import("@/app/actions");
 
     try {
       if (editingId) {
@@ -186,7 +175,7 @@ function TeacherDataTab({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    teacherType: e.target.value as any,
+                    teacherType: e.target.value as TeacherType,
                   })
                 }
               >

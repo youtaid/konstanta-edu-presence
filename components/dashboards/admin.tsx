@@ -53,6 +53,36 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+type TeacherPayStat = {
+  id: string;
+  name: string;
+  totalHonor: number;
+  sessionCount: number;
+  pendingPay: number;
+  paidPay: number;
+  teacherType: string;
+  baseSalary: number;
+  transportAllowance: number;
+  otherAllowance: number;
+  bpjsKetenagakerjaan: number;
+  bpjsKesehatan: number;
+  dailyWages: Record<string, number>;
+  schedules: Schedule[];
+  taxAmount?: number;
+  netHonor?: number;
+};
+
+type AdminTab = "ringkasan" | "gaji" | "guru" | "eval" | "reviewEval" | "periode";
+
+const ADMIN_TABS: { id: AdminTab; label: string }[] = [
+  { id: "ringkasan", label: "Ringkasan Keuangan" },
+  { id: "gaji", label: "Rincian Gaji Guru" },
+  { id: "guru", label: "Data Guru" },
+  { id: "eval", label: "Tim Eval" },
+  { id: "reviewEval", label: "Review Eval" },
+  { id: "periode", label: "Kelola Periode" },
+];
+
 export default function AdminDashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -67,11 +97,9 @@ export default function AdminDashboard() {
     isTetap: boolean;
     isWajibDetected: boolean;
   } | null>(null);
-  const [selectedSlip, setSelectedSlip] = useState<any | null>(null);
+  const [selectedSlip, setSelectedSlip] = useState<TeacherPayStat | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"ringkasan" | "gaji" | "guru" | "eval" | "reviewEval" | "periode">(
-    "ringkasan",
-  );
+  const [activeTab, setActiveTab] = useState<AdminTab>("ringkasan");
 
   const loadData = useCallback(async () => {
     const [allSchedules, allPeriods, activeP, allUsers] = await Promise.all([
@@ -223,27 +251,7 @@ export default function AdminDashboard() {
       }
       return acc;
     },
-    {} as Record<
-      string,
-      {
-        id: string;
-        name: string;
-        totalHonor: number;
-        sessionCount: number;
-        pendingPay: number;
-        paidPay: number;
-        teacherType: string;
-        baseSalary: number;
-        transportAllowance: number;
-        otherAllowance: number;
-        bpjsKetenagakerjaan: number;
-        bpjsKesehatan: number;
-        dailyWages: Record<string, number>;
-        schedules: Schedule[];
-        taxAmount?: number;
-        netHonor?: number;
-      }
-    >,
+    {} as Record<string, TeacherPayStat>,
   );
 
   // Add the base salary teachers even if they have no schedules in this period
@@ -382,42 +390,15 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex bg-gray-100/50 p-1 rounded-xl border border-gray-200">
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "ringkasan" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("ringkasan")}
-          >
-            Ringkasan Keuangan
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "gaji" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("gaji")}
-          >
-            Rincian Gaji Guru
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "guru" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("guru")}
-          >
-            Data Guru
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "eval" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("eval")}
-          >
-            Tim Eval
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "reviewEval" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("reviewEval")}
-          >
-            Review Eval
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "periode" ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("periode")}
-          >
-            Kelola Periode
-          </button>
+          {ADMIN_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? "bg-white text-teal-700 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-900"}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1118,7 +1099,7 @@ export default function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {selectedSlip.schedules.map((s: any) => (
+                          {selectedSlip.schedules.map((s) => (
                             <tr key={s.id}>
                               <td className="p-2 text-gray-500 font-mono">{s.date}</td>
                               <td className="p-2 text-gray-700 font-medium">
