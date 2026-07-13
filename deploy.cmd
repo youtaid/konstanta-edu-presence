@@ -3,10 +3,9 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 
-echo =================================================================
-echo  Konstanta Edu Presence - DEPLOY ke VPS (Docker Compose)
-echo  Target: konstanta.my.id
-echo =================================================================
+echo =======================================================
+echo  Konstanta Education - DEPLOY ke VPS (Docker Compose)
+echo =======================================================
 echo.
 
 git config --global --add safe.directory "%CD%"
@@ -15,11 +14,9 @@ REM === Validasi branch ===
 echo [1/4] Mengecek branch...
 for /f "delims=" %%b in ('git branch --show-current') do set CURRENT_BRANCH=%%b
 if not "%CURRENT_BRANCH%"=="main" (
-    echo [WARNING] Deploy disarankan dari branch main. Saat ini: %CURRENT_BRANCH%
-    set /p proceed="Lanjutkan deploy dari branch %CURRENT_BRANCH%? (y/n): "
-    if /i not "!proceed!"=="y" (
-        exit /b 1
-    )
+    echo [ERROR] Deploy harus dari branch main. Saat ini: %CURRENT_BRANCH%
+    pause
+    exit /b 1
 )
 
 REM === Load .env.local ===
@@ -55,7 +52,7 @@ git commit -m "%msg%"
 
 echo.
 echo [+] Push ke GitHub...
-git push origin %CURRENT_BRANCH%
+git push origin main
 if %errorlevel% neq 0 (
     echo [ERROR] Push gagal. Periksa koneksi internet.
     pause
@@ -67,23 +64,34 @@ echo.
 echo [4/4] Deploy ke VPS via SSH...
 echo.
 
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@148.230.98.96 "bash -s" < NUL ^
- || echo Menjalankan script remote...
+set "ENVTMP=%TEMP%\konstanta-edu-presence-deploy.env"
+> "%ENVTMP%" echo NEXT_PUBLIC_SITE_URL=!NEXT_PUBLIC_SITE_URL!
+>> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_URL=!NEXT_PUBLIC_SUPABASE_URL!
+>> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=!NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+>> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_ANON_KEY=!NEXT_PUBLIC_SUPABASE_ANON_KEY!
+>> "%ENVTMP%" echo NEXT_PUBLIC_WHATSAPP_NUMBER=!NEXT_PUBLIC_WHATSAPP_NUMBER!
+>> "%ENVTMP%" echo SUPABASE_SERVICE_ROLE_KEY=!SUPABASE_SERVICE_ROLE_KEY!
+>> "%ENVTMP%" echo SUPABASE_SECRET_KEY=!SUPABASE_SECRET_KEY!
 
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@148.230.98.96 ^
-    "set -e && ^
-     if [ ! -d /var/www/konstanta-edu-presence ]; then mkdir -p /var/www/konstanta-edu-presence; fi && ^
-     cd /var/www/konstanta-edu-presence && ^
-     if [ ! -d .git ]; then git clone https://github.com/youtaid/konstanta-edu-presence.git .; fi && ^
-     git fetch origin %CURRENT_BRANCH% && ^
-     git reset --hard origin/%CURRENT_BRANCH% && ^
-     echo 'NEXT_PUBLIC_SUPABASE_URL=!NEXT_PUBLIC_SUPABASE_URL!' > .env && ^
-     echo 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=!NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!' >> .env && ^
-     echo 'SUPABASE_SECRET_KEY=!SUPABASE_SECRET_KEY!' >> .env && ^
-     echo 'SUPABASE_JWKS_URL=!SUPABASE_JWKS_URL!' >> .env && ^
-     chmod +x deploy/scripts/update-vps.sh && ^
-     bash deploy/scripts/update-vps.sh"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@148.230.98.96 "mkdir -p /var/www/konstanta-edu-presence && cd /var/www/konstanta-edu-presence && { [ -d .git ] || git clone github-konstanta:youtaid/konstanta-edu-presence.git .; }"
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Persiapan folder/clone di VPS gagal. Cek output SSH di atas.
+    pause
+    exit /b 1
+)
 
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "%ENVTMP%" root@148.230.98.96:/var/www/konstanta-edu-presence/.env
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Gagal mengirim .env ke VPS. Cek output di atas.
+    del "%ENVTMP%" >nul 2>&1
+    pause
+    exit /b 1
+)
+del "%ENVTMP%" >nul 2>&1
+
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@148.230.98.96 "set -e; cd /var/www/konstanta-edu-presence; git remote set-url origin github-konstanta:youtaid/konstanta-edu-presence.git; git fetch origin main; git reset --hard origin/main; chmod +x deploy/scripts/update-vps.sh; bash deploy/scripts/update-vps.sh"
 if %errorlevel% neq 0 (
     echo.
     echo [ERROR] Deploy VPS gagal. Cek output SSH di atas.
@@ -92,9 +100,9 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo =================================================================
+echo =======================================================
 echo  DEPLOY SELESAI!
-echo =================================================================
+echo =======================================================
 echo.
 echo Membuka halaman production untuk verifikasi...
 start "" "https://konstanta.my.id"
