@@ -1175,3 +1175,115 @@ export async function createSchedule(data: Omit<Schedule, "id" | "status" | "arc
     });
   revalidatePath("/");
 }
+
+export async function resetStudentPassword(studentId: string): Promise<{ email?: string; password?: string; error?: string }> {
+  try {
+    await requireStaffCaller();
+    const admin = createAdminClient();
+
+    // 1. Get the student's auth_user_id
+    const { data: student, error: studentErr } = await admin
+      .from("students")
+      .select("auth_user_id, name")
+      .eq("id", studentId)
+      .single();
+
+    if (studentErr || !student) {
+      throw new Error("Siswa tidak ditemukan.");
+    }
+
+    if (!student.auth_user_id) {
+      throw new Error("Siswa ini belum memiliki akun login.");
+    }
+
+    // 2. Fetch user's email from auth.users
+    const { data: { user }, error: userErr } = await admin.auth.admin.getUserById(student.auth_user_id);
+    if (userErr || !user) {
+      throw new Error("User auth tidak ditemukan.");
+    }
+
+    // 3. Generate a new password
+    const password = generateInitialPassword();
+
+    // 4. Update the user's password in Supabase Auth
+    const { error: authError } = await admin.auth.admin.updateUserById(student.auth_user_id, {
+      password: password,
+    });
+
+    if (authError) {
+      throw new Error(authError.message);
+    }
+
+    // 5. Update profiles.must_change_password to true
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({ must_change_password: true })
+      .eq("id", student.auth_user_id);
+
+    if (profileError) {
+      throw new Error(profileError.message);
+    }
+
+    revalidatePath("/");
+    return { email: user.email, password };
+  } catch (err: any) {
+    console.error("Error in resetStudentPassword:", err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function resetParentPassword(parentId: string): Promise<{ email?: string; password?: string; error?: string }> {
+  try {
+    await requireStaffCaller();
+    const admin = createAdminClient();
+
+    // 1. Check profile role
+    const { data: profile, error: profileErr } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", parentId)
+      .single();
+
+    if (profileErr || !profile) {
+      throw new Error("Profil orang tua tidak ditemukan.");
+    }
+
+    if (profile.role !== "otk") {
+      throw new Error("User bukan ber-role orang tua.");
+    }
+
+    // 2. Fetch user's email from auth
+    const { data: { user }, error: userErr } = await admin.auth.admin.getUserById(parentId);
+    if (userErr || !user) {
+      throw new Error("User auth tidak ditemukan.");
+    }
+
+    // 3. Generate password
+    const password = generateInitialPassword();
+
+    // 4. Update password
+    const { error: authError } = await admin.auth.admin.updateUserById(parentId, {
+      password: password,
+    });
+
+    if (authError) {
+      throw new Error(authError.message);
+    }
+
+    // 5. Update must_change_password = true
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({ must_change_password: true })
+      .eq("id", parentId);
+
+    if (profileError) {
+      throw new Error(profileError.message);
+    }
+
+    revalidatePath("/");
+    return { email: user.email, password };
+  } catch (err: any) {
+    console.error("Error in resetParentPassword:", err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}

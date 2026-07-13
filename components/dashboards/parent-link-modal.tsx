@@ -7,6 +7,7 @@ import {
   linkParentToStudent,
   unlinkParentFromStudent,
   createParentAccount,
+  resetParentPassword,
 } from "@/app/actions";
 import type { ParentLink, Student } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -102,6 +103,28 @@ export default function ParentLinkModal({
     }
   };
 
+  const handleResetPassword = async (parentId: string, parentName: string) => {
+    if (!confirm(`Reset password untuk orang tua ${parentName}?`)) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const result = await resetParentPassword(parentId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setCreatedCredentials({
+        name: parentName,
+        email: result.email!,
+        password: result.password!,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mereset password orang tua.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -170,14 +193,24 @@ export default function ParentLinkModal({
                         className="flex items-center justify-between p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm"
                       >
                         <span>{l.parentName}</span>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          disabled={actionLoading}
-                          onClick={() => handleUnlink(l.parentId)}
-                        >
-                          Hapus
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={actionLoading}
+                            onClick={() => handleResetPassword(l.parentId, l.parentName)}
+                          >
+                            Reset Password
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={actionLoading}
+                            onClick={() => handleUnlink(l.parentId)}
+                          >
+                            Hapus
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

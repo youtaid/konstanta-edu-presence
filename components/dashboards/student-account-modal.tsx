@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createStudentAccount } from "@/app/actions";
+import { createStudentAccount, resetStudentPassword } from "@/app/actions";
 import type { Student } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,25 @@ export default function StudentAccountModal({
       setWasCreated(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal membuat akun siswa.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!confirm(`Reset password untuk siswa ${student.name}?`)) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const result = await resetStudentPassword(student.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setCreatedCredentials({ email: result.email!, password: result.password! });
+      setWasCreated(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mereset password siswa.");
     } finally {
       setActionLoading(false);
     }
@@ -106,6 +125,14 @@ export default function StudentAccountModal({
                 {student.hasAccount ? (
                   <div className="flex items-center justify-between p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm">
                     <span>Akun login aktif</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={actionLoading}
+                      onClick={handleResetPassword}
+                    >
+                      Reset Password
+                    </Button>
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500 italic">
