@@ -9,8 +9,11 @@ import {
   getActivePeriod,
   setActivePeriod,
   createPeriod,
+  updatePeriod,
+  deletePeriod,
   payTeacherSchedules,
   getUsers,
+  createEvalAccount,
 } from "@/app/actions";
 import { Schedule, Period, User } from "@/lib/types";
 import TeacherDataTab from "@/components/dashboards/teacher-data-tab";
@@ -71,7 +74,6 @@ export default function AdminDashboard() {
   );
 
   const loadData = useCallback(async () => {
-    setLoading(true);
     const [allSchedules, allPeriods, activeP, allUsers] = await Promise.all([
       getSchedules(),
       getPeriods(),
@@ -87,6 +89,7 @@ export default function AdminDashboard() {
   }, [selectedPeriodId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 
@@ -1190,7 +1193,6 @@ function EvalAccountTab({
     setLoading(true);
     setError(null);
     try {
-      const { createEvalAccount } = await import("@/app/actions");
       const result = await createEvalAccount(formData);
       setCreatedCredentials({ name: formData.name, email: result.email, password: result.password });
       setFormData({ name: "", email: "" });
@@ -1324,20 +1326,19 @@ function PeriodTab({ onPeriodCreated }: { onPeriodCreated: () => void }) {
   });
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadPeriods();
-  }, []);
-
-  const loadPeriods = async () => {
-    const { getPeriods } = await import("@/app/actions");
+  const loadPeriods = useCallback(async () => {
     const allPeriods = await getPeriods();
     setPeriods(allPeriods);
-  };
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPeriods();
+  }, [loadPeriods]);
 
   const handleSavePeriod = async () => {
     if (!formData.name || !formData.startDate || !formData.endDate) return;
     setLoading(true);
-    const { createPeriod, updatePeriod } = await import("@/app/actions");
 
     if (editingId) {
       await updatePeriod(editingId, formData);
@@ -1365,7 +1366,6 @@ function PeriodTab({ onPeriodCreated }: { onPeriodCreated: () => void }) {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus periode ini?")) return;
-    const { deletePeriod } = await import("@/app/actions");
     await deletePeriod(id);
     loadPeriods();
     onPeriodCreated();

@@ -53,6 +53,7 @@ export async function buildStudentReportPdf(
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer's Image has no alt prop */}
           {hasLogo && <Image src={logoPath} style={styles.logo} />}
           <Text style={styles.title}>Laporan Perkembangan Siswa</Text>
         </View>

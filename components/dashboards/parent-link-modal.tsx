@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getParentAccounts,
   getParentLinksForStudent,
@@ -34,7 +34,7 @@ export default function ParentLinkModal({
     password: string;
   } | null>(null);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     const [linkData, parentData] = await Promise.all([
       getParentLinksForStudent(student.id),
@@ -43,12 +43,12 @@ export default function ParentLinkModal({
     setLinks(linkData);
     setParentAccounts(parentData);
     setLoading(false);
-  };
+  }, [student.id]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
-  }, [student.id]);
+  }, [refresh]);
 
   const linkedParentIds = new Set(links.map((l) => l.parentId));
   const availableParents = parentAccounts.filter((p) => !linkedParentIds.has(p.id));

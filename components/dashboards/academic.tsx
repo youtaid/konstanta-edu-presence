@@ -160,7 +160,6 @@ export default function AcademicDashboard() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
     const [allSchedules, allUsers, allPrograms, allStudents] =
       await Promise.all([
         getSchedules(),
@@ -192,42 +191,36 @@ export default function AcademicDashboard() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 
-  // Synchronize teacher selection with the filter input (prevents default values like Budi Santoso when option is filtered out)
-  useEffect(() => {
-    if (teachers.length === 0) return;
+  // Keep the selected teacher valid whenever the filter text narrows the
+  // visible options (prevents a stale/hidden selection like "Budi Santoso").
+  const handleTeacherFilterChange = (value: string) => {
+    setTeacherFilter(value);
     const filtered = teachers.filter((t) =>
-      t.name.toLowerCase().includes(teacherFilter.toLowerCase())
+      t.name.toLowerCase().includes(value.toLowerCase()),
     );
-    if (filtered.length > 0) {
-      const exists = filtered.some((t) => t.teacherId === newSchedule.teacherId);
-      if (!exists) {
-        setNewSchedule((prev) => ({
-          ...prev,
-          teacherId: filtered[0].teacherId || "",
-          teacherName: filtered[0].name,
-        }));
-      }
+    if (filtered.length > 0 && !filtered.some((t) => t.teacherId === newSchedule.teacherId)) {
+      setNewSchedule((prev) => ({
+        ...prev,
+        teacherId: filtered[0].teacherId || "",
+        teacherName: filtered[0].name,
+      }));
     }
-  }, [teacherFilter, teachers, newSchedule.teacherId]);
+  };
 
-  // Synchronize subject selection with the filter input (prevents default values when option is filtered out)
-  useEffect(() => {
+  // Same idea for the subject filter: keep the selected subject valid.
+  const handleSubjectFilterChange = (value: string) => {
+    setSubjectFilter(value);
     const filtered = SUBJECTS.filter((s) =>
-      s.toLowerCase().includes(subjectFilter.toLowerCase())
+      s.toLowerCase().includes(value.toLowerCase()),
     );
-    if (filtered.length > 0) {
-      const exists = filtered.includes(newSchedule.subject);
-      if (!exists) {
-        setNewSchedule((prev) => ({
-          ...prev,
-          subject: filtered[0],
-        }));
-      }
+    if (filtered.length > 0 && !filtered.includes(newSchedule.subject)) {
+      setNewSchedule((prev) => ({ ...prev, subject: filtered[0] }));
     }
-  }, [subjectFilter, newSchedule.subject]);
+  };
 
   // Akademik only sets the KBM details + class mode. Jam kerja, jenis honor
   // (Wajib/100%/50%), and nominal honor are Admin's call — this is just an
@@ -485,7 +478,7 @@ export default function AcademicDashboard() {
                     className="w-full border rounded-md p-2 text-sm bg-white mb-1"
                     placeholder="Cari nama guru..."
                     value={teacherFilter}
-                    onChange={(e) => setTeacherFilter(e.target.value)}
+                    onChange={(e) => handleTeacherFilterChange(e.target.value)}
                   />
                   <select
                     className="w-full border rounded-md p-2 text-sm bg-white"
@@ -581,7 +574,7 @@ export default function AcademicDashboard() {
                         className="w-full border rounded-md p-2 text-sm bg-white"
                         placeholder="Cari mata pelajaran..."
                         value={subjectFilter}
-                        onChange={(e) => setSubjectFilter(e.target.value)}
+                        onChange={(e) => handleSubjectFilterChange(e.target.value)}
                       />
                       <select
                         className="w-full border rounded-md p-2 text-sm bg-white"

@@ -92,7 +92,6 @@ export default function TeacherDashboard() {
   );
 
   const loadSchedules = useCallback(async () => {
-    setLoading(true);
     const [all, allPeriods, activeP, teacherEval] = await Promise.all([
       getSchedules(),
       getPeriods(),
@@ -108,6 +107,7 @@ export default function TeacherDashboard() {
   }, [user, selectedPeriodId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSchedules();
   }, [loadSchedules]);
 
@@ -347,7 +347,7 @@ export default function TeacherDashboard() {
                     <p className="font-semibold flex items-center gap-1 text-amber-800">
                       <XCircle className="w-3.5 h-3.5 text-amber-600" /> Catatan Revisi Akademik:
                     </p>
-                    <p className="italic text-gray-700">"{schedule.report.revisionNote}"</p>
+                    <p className="italic text-gray-700">&quot;{schedule.report.revisionNote}&quot;</p>
                   </div>
                 )}
               </CardContent>
