@@ -31,6 +31,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CheckCircle, FileText, XCircle, Pencil, Trash2, Archive, ArchiveRestore, History, X, Download, Calendar, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 
+const SCHOOL_BRANCHES = [
+  "SMANU MHT",
+  "SMAN 8",
+  "SMAN 81",
+  "MAN 4",
+  "SMA Nurhikmah",
+  "SMA Global Mandiri",
+  "SMAN 7",
+  "SMAN 9",
+  "SMAN 30",
+  "SMAN 37",
+  "SMAN 48",
+  "SMAN 49",
+  "SMAN 54",
+  "SMAN 67",
+  "SMAN 77",
+  "SMAN 97",
+  "SMAN 98",
+  "SMAN 113",
+  "EPIS",
+  "MIRA",
+  "SMA Taman Harapan",
+  "SMAIT Al Haraki",
+  "SMAIT Mutiara Duri",
+  "SMAIT Tunas Bangsa",
+];
+
 type TimeFilter = "all" | "today" | "week" | "month" | "custom";
 
 function isWithinTimeFilter(
@@ -559,12 +586,14 @@ export default function AcademicDashboard() {
                     <select
                       className="w-1/3 border rounded-md p-2 text-sm bg-white"
                       value={newSchedule.program}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const newProg = e.target.value;
                         setNewSchedule({
                           ...newSchedule,
-                          program: e.target.value,
-                        })
-                      }
+                          program: newProg,
+                          branch: newProg === "PM" ? "SMANU MHT" : "Tebet",
+                        });
+                      }}
                     >
                       {programs.map((p) => (
                         <option key={p} value={p}>
@@ -634,10 +663,20 @@ export default function AcademicDashboard() {
                       })
                     }
                   >
-                    <option value="Tebet">Tebet</option>
-                    <option value="Kuningan">Kuningan</option>
-                    <option value="Depok">Depok</option>
-                    <option value="Bekasi">Bekasi</option>
+                    {newSchedule.program === "PM" ? (
+                      SCHOOL_BRANCHES.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Tebet">Tebet</option>
+                        <option value="Kuningan">Kuningan</option>
+                        <option value="Depok">Depok</option>
+                        <option value="Bekasi">Bekasi</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -1129,9 +1168,15 @@ export default function AcademicDashboard() {
                     value={editModal.form.branch}
                     onChange={(e) => setEditModal({ ...editModal, form: { ...editModal.form, branch: e.target.value } })}
                   >
-                    {["Tebet", "Depok", "Kuningan", "Bekasi"].map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
+                    {editModal.form.program === "PM" ? (
+                      SCHOOL_BRANCHES.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))
+                    ) : (
+                      ["Tebet", "Depok", "Kuningan", "Bekasi"].map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>
@@ -1163,7 +1208,17 @@ export default function AcademicDashboard() {
                   <select
                     className="w-full border rounded-md p-2 text-sm bg-white"
                     value={editModal.form.program}
-                    onChange={(e) => setEditModal({ ...editModal, form: { ...editModal.form, program: e.target.value } })}
+                    onChange={(e) => {
+                      const newProg = e.target.value;
+                      setEditModal({
+                        ...editModal,
+                        form: {
+                          ...editModal.form,
+                          program: newProg,
+                          branch: newProg === "PM" ? "SMANU MHT" : "Tebet",
+                        }
+                      });
+                    }}
                   >
                     {programs.map((p) => (
                       <option key={p} value={p}>{p}</option>
