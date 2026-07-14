@@ -39,10 +39,6 @@ else
   echo "[WARNING] .env atau .env.local tidak ditemukan! Docker build mungkin kekurangan environment variables."
 fi
 
-echo "-> Stopping old konstanta-education-website container if running..."
-docker stop konstanta-education-website || true
-docker rm konstanta-education-website || true
-
 echo "-> Building and starting Docker containers..."
 $DOCKER_COMPOSE_CMD up --build -d
 

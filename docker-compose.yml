@@ -17,4 +17,4 @@ services:
       - SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY}
       - SUPABASE_JWKS_URL=${SUPABASE_JWKS_URL}
     ports:
-      - "3003:3003"
+      - "3004:3003"
