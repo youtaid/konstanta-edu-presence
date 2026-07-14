@@ -359,9 +359,21 @@ export default function AcademicDashboard() {
     setIsDeleting(true);
     try {
       if (deleteConfirm.mode === "single" && deleteConfirm.scheduleId) {
-        await deleteSchedule(deleteConfirm.scheduleId);
+        const result = await deleteSchedule(deleteConfirm.scheduleId);
+        if (result?.error) {
+          alert(result.error);
+          setIsDeleting(false);
+          setDeleteConfirm(null);
+          return;
+        }
       } else {
-        await deleteSchedulesBulk(Array.from(selectedIds));
+        const result = await deleteSchedulesBulk(Array.from(selectedIds));
+        if (result?.error) {
+          alert(result.error);
+          setIsDeleting(false);
+          setDeleteConfirm(null);
+          return;
+        }
         setSelectedIds(new Set());
       }
       await loadData();

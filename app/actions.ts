@@ -978,24 +978,38 @@ export async function setSchedulesArchived(ids: string[], archived: boolean) {
   revalidatePath("/");
 }
 
-export async function deleteSchedule(id: string) {
-  await requireStaffCaller();
-  const admin = createAdminClient();
-  // Also delete related student_session_reports
-  await admin.from("student_session_reports").delete().eq("schedule_id", id);
-  const { error } = await admin.from("schedules").delete().eq("id", id);
-  if (error) throw new Error(`Gagal menghapus jadwal: ${error.message}`);
-  revalidatePath("/");
+export async function deleteSchedule(id: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    await requireStaffCaller();
+    const admin = createAdminClient();
+    // Also delete related student_session_reports
+    const { error: ssrError } = await admin.from("student_session_reports").delete().eq("schedule_id", id);
+    if (ssrError) throw new Error(ssrError.message);
+    const { error } = await admin.from("schedules").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in deleteSchedule:", err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
-export async function deleteSchedulesBulk(ids: string[]) {
-  if (ids.length === 0) return;
-  await requireStaffCaller();
-  const admin = createAdminClient();
-  await admin.from("student_session_reports").delete().in("schedule_id", ids);
-  const { error } = await admin.from("schedules").delete().in("id", ids);
-  if (error) throw new Error(`Gagal menghapus jadwal: ${error.message}`);
-  revalidatePath("/");
+export async function deleteSchedulesBulk(ids: string[]): Promise<{ success?: boolean; error?: string }> {
+  try {
+    if (ids.length === 0) return { success: true };
+    await requireStaffCaller();
+    const admin = createAdminClient();
+    const { error: ssrError } = await admin.from("student_session_reports").delete().in("schedule_id", ids);
+    if (ssrError) throw new Error(ssrError.message);
+    const { error } = await admin.from("schedules").delete().in("id", ids);
+    if (error) throw new Error(error.message);
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in deleteSchedulesBulk:", err);
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function updateSchedule(id: string, data: Partial<Schedule>) {
