@@ -30,13 +30,11 @@ git fetch --prune origin
 git pull --ff-only origin "$BRANCH"
 
 echo "-> Synchronizing environment variables for Docker build..."
-if [ -f .env.local ]; then
-  cp .env.local .env
-  echo "   .env.local berhasil disalin ke .env."
-elif [ -f .env ]; then
-  echo "   Menggunakan file .env yang sudah ada."
+if [ -f .env ]; then
+  echo "   Menggunakan .env terbaru yang dikirim oleh proses deploy."
 else
-  echo "[WARNING] .env atau .env.local tidak ditemukan! Docker build mungkin kekurangan environment variables."
+  echo "[ERROR] .env tidak ditemukan. Deploy dibatalkan."
+  exit 1
 fi
 
 for required_var in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_SECRET_KEY; do
