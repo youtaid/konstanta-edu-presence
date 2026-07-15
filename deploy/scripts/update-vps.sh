@@ -39,6 +39,14 @@ else
   echo "[WARNING] .env atau .env.local tidak ditemukan! Docker build mungkin kekurangan environment variables."
 fi
 
+for required_var in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_SECRET_KEY; do
+  if ! grep -Eq "^${required_var}=.+$" .env; then
+    echo "[ERROR] ${required_var} tidak tersedia di .env. Deploy dibatalkan."
+    exit 1
+  fi
+done
+echo "   Konfigurasi Supabase wajib terdeteksi."
+
 echo "-> Building and starting Docker containers..."
 $DOCKER_COMPOSE_CMD up --build -d
 

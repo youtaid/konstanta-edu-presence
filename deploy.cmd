@@ -38,6 +38,23 @@ for /f "usebackq tokens=1,* delims==" %%A in (".env.local") do (
 )
 echo    .env.local berhasil dimuat.
 
+if not defined NEXT_PUBLIC_SUPABASE_URL (
+    echo [ERROR] NEXT_PUBLIC_SUPABASE_URL kosong di .env.local.
+    pause
+    exit /b 1
+)
+if not defined NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (
+    echo [ERROR] NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY kosong di .env.local.
+    pause
+    exit /b 1
+)
+if not defined SUPABASE_SECRET_KEY (
+    echo [ERROR] SUPABASE_SECRET_KEY kosong di .env.local.
+    pause
+    exit /b 1
+)
+echo    Konfigurasi Supabase wajib terdeteksi.
+
 REM === Git commit dan push ===
 echo.
 echo [3/4] Status perubahan lokal:
@@ -68,9 +85,7 @@ set "ENVTMP=%TEMP%\konstanta-edu-presence-deploy.env"
 > "%ENVTMP%" echo NEXT_PUBLIC_SITE_URL=!NEXT_PUBLIC_SITE_URL!
 >> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_URL=!NEXT_PUBLIC_SUPABASE_URL!
 >> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=!NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
->> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_ANON_KEY=!NEXT_PUBLIC_SUPABASE_ANON_KEY!
 >> "%ENVTMP%" echo NEXT_PUBLIC_WHATSAPP_NUMBER=!NEXT_PUBLIC_WHATSAPP_NUMBER!
->> "%ENVTMP%" echo SUPABASE_SERVICE_ROLE_KEY=!SUPABASE_SERVICE_ROLE_KEY!
 >> "%ENVTMP%" echo SUPABASE_SECRET_KEY=!SUPABASE_SECRET_KEY!
 
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@148.230.98.96 "mkdir -p /var/www/konstanta-edu-presence && cd /var/www/konstanta-edu-presence && { [ -d .git ] || git clone github-konstanta:youtaid/konstanta-edu-presence.git .; }"

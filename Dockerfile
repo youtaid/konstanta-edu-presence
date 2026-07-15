@@ -29,18 +29,17 @@ ENV PORT=3004
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy built assets, dependencies, and the .env file for runtime
+# Copy built assets and dependencies. Runtime secrets are injected by Compose;
+# they must not be baked into an image layer.
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./next.config.ts
-COPY --from=builder /app/.env ./.env
 
-# Set correct ownership for nextjs runtime directories
-RUN chown -R nextjs:nodejs /app/.next && \
-    chown nextjs:nodejs /app/.env
+# Set correct ownership for Next.js runtime directories
+RUN chown -R nextjs:nodejs /app/.next
 
 USER nextjs
 
