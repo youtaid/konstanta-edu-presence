@@ -11,12 +11,14 @@ import {
   submitEvaluationAssessment,
   updateEvaluationAssessment,
   upsertEvaluationResultsBulk,
+  getDiagnosticReportsList,
+  uploadDiagnosticReport,
 } from "@/app/actions";
 import type { EvaluationAssessment, EvaluationType, Student, User } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckSquare, ClipboardList, Edit, Save, Send, Users } from "lucide-react";
+import { CheckSquare, ClipboardList, Edit, Save, Send, Users, FileUp, Download, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 type ResultDraft = {
   studentId: string;
@@ -56,6 +58,49 @@ export default function EvalDashboard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Diagnostic report coordination states
+  const [activeDashboardTab, setActiveDashboardTab] = useState<"asesmen" | "diagnostik">("asesmen");
+  const [diagnosticReports, setDiagnosticReports] = useState<any[]>([]);
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(false);
+  const [uploadingGrade, setUploadingGrade] = useState<string | null>(null);
+
+  const loadDiagnostics = useCallback(async () => {
+    setLoadingDiagnostics(true);
+    try {
+      const data = await getDiagnosticReportsList();
+      setDiagnosticReports(data);
+    } catch (err) {
+      console.error("Gagal memuat hasil diagnostik:", err);
+    } finally {
+      setLoadingDiagnostics(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeDashboardTab === "diagnostik") {
+      loadDiagnostics();
+    }
+  }, [activeDashboardTab, loadDiagnostics]);
+
+  const handleUploadDiagnostic = async (grade: string, file: File) => {
+    if (!file) return;
+    setUploadingGrade(grade);
+    setMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadDiagnosticReport(grade, formData);
+      if (res.success) {
+        await loadDiagnostics();
+        setMessage(`Laporan Diagnostik Kelas ${grade} berhasil diunggah.`);
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Gagal mengunggah laporan.");
+    } finally {
+      setUploadingGrade(null);
+    }
+  };
 
   const loadData = useCallback(async () => {
     const [allAssessments, allStudents, allUsers, allPrograms] = await Promise.all([
@@ -232,260 +277,386 @@ export default function EvalDashboard() {
         </Button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="text-lg">Daftar Asesmen</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 max-h-[620px] overflow-y-auto">
-            {assessments.map((assessment) => (
-              <button
-                key={assessment.id}
-                onClick={() => openAssessment(assessment)}
-                className={`w-full text-left rounded-lg border p-3 transition-all ${
-                  selectedId === assessment.id
-                    ? "border-teal-300 bg-teal-50 text-teal-900"
-                    : "border-gray-200 bg-white hover:border-teal-200 hover:bg-gray-50"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold text-sm">{assessment.title}</span>
-                  <Badge variant={statusVariant(assessment.status)} className="text-[10px]">
-                    {assessment.status}
-                  </Badge>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {assessment.assessmentDate} - {assessment.subject}
-                </p>
-                <p className="text-[11px] text-gray-400 mt-1">
-                  {assessment.results.length} siswa, {assessment.teacherRecipients.length} guru
-                </p>
-              </button>
-            ))}
-            {assessments.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-8">Belum ada asesmen Eval.</p>
-            )}
-          </CardContent>
-        </Card>
+      {/* Dashboard Tabs */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => { setActiveDashboardTab("asesmen"); setMessage(null); }}
+          className={`flex items-center gap-2 pb-3 px-5 font-semibold text-sm transition-all border-b-2 -mb-[2px] ${
+            activeDashboardTab === "asesmen"
+              ? "border-teal-600 text-teal-600 font-bold"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <ClipboardList className="w-4 h-4" />
+          Asesmen Harian
+        </button>
+        <button
+          onClick={() => { setActiveDashboardTab("diagnostik"); setMessage(null); }}
+          className={`flex items-center gap-2 pb-3 px-5 font-semibold text-sm transition-all border-b-2 -mb-[2px] ${
+            activeDashboardTab === "diagnostik"
+              ? "border-teal-600 text-teal-600 font-bold"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <FileUp className="w-4 h-4" />
+          Koordinasi Tes Diagnostik
+        </button>
+      </div>
 
-        <Card>
-          <CardHeader className="border-b">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle className="text-xl text-teal-800">
-                  {selectedAssessment ? "Edit Asesmen Eval" : "Asesmen Eval Baru"}
-                </CardTitle>
-                {selectedAssessment?.reviewNote && (
-                  <p className="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg p-2 mt-2">
-                    Catatan review: {selectedAssessment.reviewNote}
+      {activeDashboardTab === "asesmen" ? (
+        <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle className="text-lg">Daftar Asesmen</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 max-h-[620px] overflow-y-auto">
+              {assessments.map((assessment) => (
+                <button
+                  key={assessment.id}
+                  onClick={() => openAssessment(assessment)}
+                  className={`w-full text-left rounded-lg border p-3 transition-all ${
+                    selectedId === assessment.id
+                      ? "border-teal-300 bg-teal-50 text-teal-900"
+                      : "border-gray-200 bg-white hover:border-teal-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold text-sm">{assessment.title}</span>
+                    <Badge variant={statusVariant(assessment.status)} className="text-[10px]">
+                      {assessment.status}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {assessment.assessmentDate} - {assessment.subject}
                   </p>
-                )}
-              </div>
-              {selectedAssessment && <Badge variant={statusVariant(selectedAssessment.status)}>{selectedAssessment.status}</Badge>}
-            </div>
-          </CardHeader>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {assessment.results.length} siswa, {assessment.teacherRecipients.length} guru
+                  </p>
+                </button>
+              ))}
+              {assessments.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-8">Belum ada asesmen Eval.</p>
+              )}
+            </CardContent>
+          </Card>
 
-          <CardContent className="space-y-6 pt-5">
-            {message && (
-              <div className="rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm text-teal-800">
-                {message}
+          <Card>
+            <CardHeader className="border-b">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="text-xl text-teal-800">
+                    {selectedAssessment ? "Edit Asesmen Eval" : "Asesmen Eval Baru"}
+                  </CardTitle>
+                  {selectedAssessment?.reviewNote && (
+                    <p className="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg p-2 mt-2">
+                      Catatan review: {selectedAssessment.reviewNote}
+                    </p>
+                  )}
+                </div>
+                {selectedAssessment && <Badge variant={statusVariant(selectedAssessment.status)}>{selectedAssessment.status}</Badge>}
               </div>
-            )}
+            </CardHeader>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Judul Asesmen</label>
-                <input
-                  disabled={!isEditable}
-                  className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="Kuis Integral / TO UTBK Paket 1"
-                />
+            <CardContent className="space-y-6 pt-5">
+              {message && (
+                <div className="rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm text-teal-800">
+                  {message}
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Judul Asesmen</label>
+                  <input
+                    disabled={!isEditable}
+                    className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="Kuis Integral / TO UTBK Paket 1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Tipe</label>
+                  <select
+                    disabled={!isEditable}
+                    className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
+                    value={form.assessmentType}
+                    onChange={(e) => setForm({ ...form, assessmentType: e.target.value as EvaluationType })}
+                  >
+                    {ASSESSMENT_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Mata Pelajaran</label>
+                  <input
+                    disabled={!isEditable}
+                    className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
+                    value={form.subject}
+                    onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                    placeholder="Matematika"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Tanggal</label>
+                  <input
+                    disabled={!isEditable}
+                    type="date"
+                    className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
+                    value={form.assessmentDate}
+                    onChange={(e) => setForm({ ...form, assessmentDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Program</label>
+                  <select
+                    disabled={!isEditable}
+                    className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
+                    value={form.program}
+                    onChange={(e) => setForm({ ...form, program: e.target.value, className: "" })}
+                  >
+                    <option value="">Semua Program</option>
+                    {programs.map((program) => (
+                      <option key={program} value={program}>{program}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Kelas</label>
+                  <select
+                    disabled={!isEditable}
+                    className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
+                    value={form.className}
+                    onChange={(e) => setForm({ ...form, className: e.target.value })}
+                  >
+                    <option value="">Semua Kelas</option>
+                    {classOptions.map((cls) => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
               <div>
-                <label className="text-sm font-medium mb-1 block">Tipe</label>
-                <select
-                  disabled={!isEditable}
-                  className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
-                  value={form.assessmentType}
-                  onChange={(e) => setForm({ ...form, assessmentType: e.target.value as EvaluationType })}
-                >
-                  {ASSESSMENT_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Mata Pelajaran</label>
-                <input
-                  disabled={!isEditable}
-                  className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
-                  value={form.subject}
-                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  placeholder="Matematika"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Tanggal</label>
-                <input
-                  disabled={!isEditable}
-                  type="date"
-                  className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
-                  value={form.assessmentDate}
-                  onChange={(e) => setForm({ ...form, assessmentDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Program</label>
-                <select
-                  disabled={!isEditable}
-                  className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
-                  value={form.program}
-                  onChange={(e) => setForm({ ...form, program: e.target.value, className: "" })}
-                >
-                  <option value="">Semua Program</option>
-                  {programs.map((program) => (
-                    <option key={program} value={program}>{program}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Kelas</label>
-                <select
-                  disabled={!isEditable}
-                  className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
-                  value={form.className}
-                  onChange={(e) => setForm({ ...form, className: e.target.value })}
-                >
-                  <option value="">Semua Kelas</option>
-                  {classOptions.map((className) => (
-                    <option key={className} value={className}>{className}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Skor Maksimum</label>
-                <input
-                  disabled={!isEditable}
-                  type="number"
-                  min={0}
-                  className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
-                  value={form.maxScore}
-                  onChange={(e) => setForm({ ...form, maxScore: e.target.value })}
-                  placeholder="100"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Deskripsi</label>
-                <input
+                <label className="text-sm font-medium mb-1 block">Keterangan / Deskripsi</label>
+                <textarea
                   disabled={!isEditable}
                   className="w-full border rounded-md p-2 text-sm bg-white disabled:bg-gray-100"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Opsional"
+                  placeholder="Keterangan tambahan..."
+                  rows={2}
                 />
               </div>
-            </div>
 
-            <div className="border rounded-xl p-4 bg-gray-50/60">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckSquare className="w-4 h-4 text-teal-700" />
-                <h3 className="font-semibold text-gray-900">Guru Penerima Feedback</h3>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {teachers.map((teacher) => (
-                  <label key={teacher.id} className="flex items-center gap-2 text-sm bg-white border rounded-lg p-2">
-                    <input
-                      disabled={!isEditable}
-                      type="checkbox"
-                      checked={selectedTeacherIds.has(teacher.id)}
-                      onChange={(e) => {
-                        setSelectedTeacherIds((prev) => {
-                          const next = new Set(prev);
-                          if (e.target.checked) next.add(teacher.id);
-                          else next.delete(teacher.id);
-                          return next;
-                        });
-                      }}
-                    />
-                    <span>{teacher.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="border rounded-xl overflow-hidden">
-              <div className="bg-gray-50 border-b p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-teal-700" />
-                  <h3 className="font-semibold text-gray-900">Input Siswa ({filteredStudents.length})</h3>
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1.5">
+                  <Users className="w-4 h-4" />
+                  Bagikan ke Guru (Teacher Recipients)
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {teachers.map((teacher) => {
+                    const isSelected = selectedTeacherIds.has(teacher.id);
+                    return (
+                      <button
+                        key={teacher.id}
+                        disabled={!isEditable}
+                        onClick={() => {
+                          setSelectedTeacherIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(teacher.id)) {
+                              next.delete(teacher.id);
+                            } else {
+                              next.add(teacher.id);
+                            }
+                            return next;
+                          });
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                          isSelected
+                            ? "bg-teal-50 border-teal-300 text-teal-800 font-semibold"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {teacher.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="divide-y max-h-[520px] overflow-y-auto">
-                {filteredStudents.map((student) => {
-                  const draft = resultDrafts[student.id] || { studentId: student.id, score: "", qualitativeFeedback: "" };
-                  return (
-                    <div key={student.id} className="grid gap-3 p-3 md:grid-cols-[minmax(160px,220px)_110px_minmax(0,1fr)]">
-                      <div>
-                        <p className="font-semibold text-sm text-gray-900">{student.name}</p>
-                        <p className="text-xs text-gray-500">{student.program} {student.className ? `- ${student.className}` : ""}</p>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
+                  <CheckSquare className="w-4 h-4" />
+                  Isi Feedback & Nilai Siswa
+                </h3>
+                <div className="space-y-3">
+                  {filteredStudents.map((student) => {
+                    const draft = resultDrafts[student.id] || { studentId: student.id, score: "", qualitativeFeedback: "" };
+                    return (
+                      <div key={student.id} className="p-3 bg-gray-50/50 border rounded-lg flex flex-col gap-3 md:flex-row md:items-center">
+                        <div className="md:w-1/3">
+                          <span className="font-semibold text-sm text-gray-900 block">{student.name}</span>
+                          <span className="text-[10px] text-gray-500">{student.program} {student.className && `• ${student.className}`}</span>
+                        </div>
+                        <div className="flex gap-2 items-center md:w-24">
+                          <input
+                            disabled={!isEditable}
+                            type="number"
+                            className="w-full border rounded p-1 text-sm bg-white text-center"
+                            value={draft.score}
+                            onChange={(e) => updateResult(student.id, { score: e.target.value })}
+                            placeholder="Nilai"
+                            min={0}
+                            max={100}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <input
+                            disabled={!isEditable}
+                            className="w-full border rounded p-1 text-sm bg-white"
+                            value={draft.qualitativeFeedback}
+                            onChange={(e) => updateResult(student.id, { qualitativeFeedback: e.target.value })}
+                            placeholder="Feedback kualitatif..."
+                          />
+                        </div>
                       </div>
+                    );
+                  })}
+                  {filteredStudents.length === 0 && (
+                    <p className="text-center text-sm text-gray-500 py-8">Tidak ada siswa pada filter ini.</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+
+            <CardFooter className="border-t bg-gray-50/60 flex justify-end gap-2">
+              {!isEditable && (
+                <p className="text-sm text-gray-500 mr-auto">Asesmen yang sudah submitted/published tidak bisa diedit oleh Eval.</p>
+              )}
+              {isEditable && (
+                <>
+                  <Button variant="outline" onClick={saveDraft} disabled={saving}>
+                    <Save className="w-4 h-4 mr-2" /> Simpan Draft
+                  </Button>
+                  <Button onClick={submitForReview} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    <Send className="w-4 h-4 mr-2" /> Submit Review
+                  </Button>
+                </>
+              )}
+              {selectedAssessment && (
+                <Button variant="outline" onClick={() => openAssessment(selectedAssessment)}>
+                  <Edit className="w-4 h-4 mr-2" /> Muat Ulang
+                </Button>
+              )}
+            </CardFooter>
+          </Card>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-fadeIn">
+          {message && (
+            <div className="rounded-lg border border-teal-100 bg-teal-50 p-4 text-sm text-teal-800 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-teal-600 shrink-0" />
+              {message}
+            </div>
+          )}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl text-teal-800 flex items-center gap-2">
+                <FileUp className="w-5 h-5" />
+                Manajemen Laporan Tes Diagnostik
+              </CardTitle>
+              <p className="text-xs text-gray-500">
+                Unggah hasil tes diagnostik (format berkas .xlsx) untuk setiap angkatan siswa. File ini akan terintegrasi langsung dan dapat diunduh oleh KEnz (Siswa) dan OTK (Orang Tua) yang sesuai tingkat kelasnya.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {loadingDiagnostics ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
+                  Memproses laporan diagnostik...
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {diagnosticReports.map((report) => (
+                    <div key={report.grade} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm flex flex-col justify-between space-y-4 hover:border-teal-200 transition-all">
                       <div>
-                        <label className="text-xs text-gray-500 block mb-1">Skor</label>
-                        <input
-                          disabled={!isEditable}
-                          type="number"
-                          min={0}
-                          max={form.maxScore ? Number(form.maxScore) : undefined}
-                          className="w-full border rounded-md p-2 text-sm disabled:bg-gray-100"
-                          value={draft.score}
-                          onChange={(e) => updateResult(student.id, { score: e.target.value })}
-                        />
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-gray-900 text-base">Siswa Kelas {report.grade}</h4>
+                            <span className="text-[10px] text-gray-400 font-medium block mt-0.5">Angkatan Tingkat {report.grade}</span>
+                          </div>
+                          <Badge variant={report.exists ? "success" : "outline"} className="text-[10px] font-semibold px-2 py-0.5">
+                            {report.exists ? "Tersedia" : "Belum Ada"}
+                          </Badge>
+                        </div>
+                        
+                        {report.exists ? (
+                          <div className="mt-3 text-xs text-gray-600 space-y-1 bg-gray-50 p-2.5 rounded-lg border border-gray-100 font-mono">
+                            <p className="truncate"><strong>Berkas:</strong> {report.fileName}</p>
+                            <p><strong>Ukuran:</strong> {Math.round(report.sizeBytes / 1024 * 10) / 10} KB</p>
+                            <p><strong>Pembaruan:</strong> {new Date(report.updatedAt).toLocaleString("id-ID")}</p>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-amber-600 italic mt-3 bg-amber-50 p-2.5 rounded-lg border border-amber-100 flex items-center gap-1.5 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            Laporan belum diunggah untuk angkatan ini.
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">Feedback Kualitatif</label>
-                        <textarea
-                          disabled={!isEditable}
-                          rows={2}
-                          className="w-full border rounded-md p-2 text-sm disabled:bg-gray-100"
-                          value={draft.qualitativeFeedback}
-                          onChange={(e) => updateResult(student.id, { qualitativeFeedback: e.target.value })}
-                          placeholder="Catatan perkembangan, miskonsepsi, atau saran tindak lanjut..."
-                        />
+                      
+                      <div className="pt-2 flex gap-2">
+                        {report.exists && (
+                          <Button variant="outline" size="sm" asChild className="flex-1 text-xs h-9">
+                            <a href={`/Tes Diagnostik/${report.fileName}`} download>
+                              <Download className="w-3.5 h-3.5 mr-1" /> Unduh
+                            </a>
+                          </Button>
+                        )}
+                        <div className="relative flex-1">
+                          <input
+                            type="file"
+                            accept=".xlsx"
+                            id={`file-upload-${report.grade}`}
+                            className="hidden"
+                            disabled={uploadingGrade !== null}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleUploadDiagnostic(report.grade, file);
+                              }
+                            }}
+                          />
+                          <Button
+                            variant={report.exists ? "secondary" : "default"}
+                            size="sm"
+                            className={`w-full text-xs h-9 ${!report.exists && "bg-teal-600 hover:bg-teal-700 text-white"}`}
+                            disabled={uploadingGrade !== null}
+                            onClick={() => document.getElementById(`file-upload-${report.grade}`)?.click()}
+                          >
+                            {uploadingGrade === report.grade ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                Mengunggah...
+                              </>
+                            ) : (
+                              <>
+                                <FileUp className="w-3.5 h-3.5 mr-1" />
+                                {report.exists ? "Ganti File" : "Unggah Excel"}
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
-                {filteredStudents.length === 0 && (
-                  <p className="text-center text-sm text-gray-500 py-8">Tidak ada siswa pada filter ini.</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-
-          <CardFooter className="border-t bg-gray-50/60 flex justify-end gap-2">
-            {!isEditable && (
-              <p className="text-sm text-gray-500 mr-auto">Asesmen yang sudah submitted/published tidak bisa diedit oleh Eval.</p>
-            )}
-            {isEditable && (
-              <>
-                <Button variant="outline" onClick={saveDraft} disabled={saving}>
-                  <Save className="w-4 h-4 mr-2" /> Simpan Draft
-                </Button>
-                <Button onClick={submitForReview} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  <Send className="w-4 h-4 mr-2" /> Submit Review
-                </Button>
-              </>
-            )}
-            {selectedAssessment && (
-              <Button variant="outline" onClick={() => openAssessment(selectedAssessment)}>
-                <Edit className="w-4 h-4 mr-2" /> Muat Ulang
-              </Button>
-            )}
-          </CardFooter>
-        </Card>
-      </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

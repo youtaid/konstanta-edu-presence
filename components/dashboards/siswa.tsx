@@ -6,6 +6,9 @@ import type { Student } from "@/lib/types";
 import StudentProgressView from "@/components/student-progress-view";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { FileDown, FileSpreadsheet } from "lucide-react";
+import { formatStudentClassAndProgram } from "@/lib/format-utils";
 
 // getStudents() runs through the cookie-bound (RLS-respecting) client, so a
 // KEnz account only ever gets back its own students row (auth_user_id match).
@@ -39,11 +42,26 @@ export default function SiswaDashboard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Halo, {me.name}!</CardTitle>
-        <div className="flex gap-2 mt-1">
-          <Badge variant="outline">{me.program}</Badge>
-          {me.className && <Badge variant="secondary">{me.className}</Badge>}
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <div>
+          <CardTitle className="text-xl font-bold">Halo, {me.name}!</CardTitle>
+          <div className="flex gap-2 mt-1.5">
+            <Badge variant="outline">
+              {formatStudentClassAndProgram(me.program, me.className)}
+            </Badge>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" asChild className="h-8 text-xs">
+            <a href={`/api/students/${me.id}/report?format=pdf`} download>
+              <FileDown className="w-3.5 h-3.5 mr-1" /> Unduh PDF
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="h-8 text-xs">
+            <a href={`/api/students/${me.id}/report?format=docx`} download>
+              <FileSpreadsheet className="w-3.5 h-3.5 mr-1" /> Unduh Word
+            </a>
+          </Button>
         </div>
       </CardHeader>
       <CardContent>

@@ -273,15 +273,15 @@ CREATE POLICY "Settings are readable by authenticated users"
   ON public.settings FOR SELECT
   USING (true);
 
+-- Reads the JWT app_metadata claim (same pattern as every other policy in
+-- this file), not the mutable public.profiles.role column: profiles.role is
+-- self-editable via "Users can update their own profile" above, so trusting
+-- it here would let any authenticated user grant themselves settings access.
 DROP POLICY IF EXISTS "Settings are manageable by admin" ON public.settings;
 CREATE POLICY "Settings are manageable by admin"
   ON public.settings FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
+  WITH CHECK ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 
 -- Other tables: staff (the 5 roles that existed before OTK/KEnz) get full
 -- access; OTK/KEnz get narrow, scoped SELECT-only access below. Previously

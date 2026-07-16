@@ -18,6 +18,8 @@ import {
 } from "@/lib/types";
 import { mapProfileToUser } from "@/lib/profile-mapper";
 import { revalidatePath } from "next/cache";
+import fs from "fs/promises";
+import path from "path";
 
 async function getSupabase() {
   const cookieStore = await cookies();
@@ -1036,8 +1038,20 @@ export async function updateSchedule(id: string, data: Partial<Schedule>) {
   revalidatePath("/");
 }
 
+// VALIDATED/PAID are Admin's payroll finalization; WAITING_VALIDATION is
+// Akademik's report-verification step. Other transitions (e.g. a teacher's
+// own APPROVED/REJECTED/IN_PROGRESS) stay ungated so self-service check-in
+// flows in teacher.tsx keep working — RLS alone still scopes those to staff.
 export async function updateScheduleStatus(id: string, status: ScheduleStatus) {
   const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const role = (user?.app_metadata as any)?.role;
+  if ((status === "VALIDATED" || status === "PAID") && role !== "admin") {
+    throw new Error("Hanya Admin yang dapat memvalidasi/menandai lunas jadwal ini.");
+  }
+  if (status === "WAITING_VALIDATION" && !["admin", "akademik"].includes(role)) {
+    throw new Error("Hanya Admin/Akademik yang dapat memverifikasi laporan ini.");
+  }
   await supabase
     .from("schedules")
     .update({ status })
@@ -1046,6 +1060,7 @@ export async function updateScheduleStatus(id: string, status: ScheduleStatus) {
 }
 
 export async function updateScheduleHonor(id: string, honorAmount: number, honorType?: Schedule["honorType"]) {
+  await requireRoleCaller(["admin"]);
   const supabase = await getSupabase();
   const updateData: Record<string, unknown> = { honor_amount: honorAmount };
   if (honorType) updateData.honor_type = honorType;
@@ -1300,4 +1315,224 @@ export async function resetParentPassword(parentId: string): Promise<{ email?: s
     console.error("Error in resetParentPassword:", err);
     return { error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+export async function getDiagnosticReportsList() {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Tidak diotorisasi.");
+  }
+
+  const dirPath = path.join(process.cwd(), "public", "Tes Diagnostik");
+  const grades = ["9", "10", "11", "12"];
+  const list = [];
+
+  for (const grade of grades) {
+    const fileName = `Laporan Diagnostik Kelas ${grade}.xlsx`;
+    const filePath = path.join(dirPath, fileName);
+    try {
+      const stats = await fs.stat(filePath);
+      list.push({
+        grade,
+        exists: true,
+        fileName,
+        sizeBytes: stats.size,
+        updatedAt: stats.mtime.toISOString(),
+      });
+    } catch {
+      list.push({
+        grade,
+        exists: false,
+        fileName,
+        sizeBytes: 0,
+        updatedAt: null,
+      });
+    }
+  }
+
+  return list;
+}
+
+export async function uploadDiagnosticReport(grade: string, formData: FormData) {
+  // Authorization check (only eval, admin, akademik allowed)
+  await requireRoleCaller(["eval", "admin", "akademik"]);
+
+  const file = formData.get("file") as File;
+  if (!file) {
+    throw new Error("File tidak ditemukan.");
+  }
+
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
+  const dirPath = path.join(process.cwd(), "public", "Tes Diagnostik");
+  const fileName = `Laporan Diagnostik Kelas ${grade}.xlsx`;
+  const filePath = path.join(dirPath, fileName);
+
+  // Ensure directory exists
+  await fs.mkdir(dirPath, { recursive: true });
+
+  // Write file
+  await fs.writeFile(filePath, buffer);
+
+  revalidatePath("/");
+  return { success: true, fileName };
+}
+
+export async function getStudentDiagnosticReport(studentId: string) {
+  const supabase = await getSupabase();
+  const { data: student, error } = await supabase
+    .from("students")
+    .select("*")
+    .eq("id", studentId)
+    .single();
+
+  if (error || !student) return null;
+
+  const classGrade = student.class_name ? (student.class_name.match(/^(\d+)/)?.[1] || null) : null;
+  if (!classGrade) return null;
+
+  const dirPath = path.join(process.cwd(), "public", "Tes Diagnostik");
+
+  // Check for personal PDF in public/Tes Diagnostik/ using student's name
+  const fsNode = require("fs");
+  let pdfUrl: string | null = null;
+  const pdfFileName = `${student.name}.pdf`;
+  const directPdfPath = path.join(dirPath, pdfFileName);
+
+  if (fsNode.existsSync(directPdfPath)) {
+    pdfUrl = `/Tes Diagnostik/${encodeURIComponent(pdfFileName)}`;
+  } else {
+    // Check if a directory with the student's name exists
+    const studentDirPath = path.join(dirPath, student.name);
+    if (fsNode.existsSync(studentDirPath) && fsNode.statSync(studentDirPath).isDirectory()) {
+      const filesInDir = fsNode.readdirSync(studentDirPath);
+      const pdfFile = filesInDir.find((f: string) => f.toLowerCase().endsWith('.pdf'));
+      if (pdfFile) {
+        pdfUrl = `/Tes Diagnostik/${encodeURIComponent(student.name)}/${encodeURIComponent(pdfFile)}`;
+      }
+    }
+  }
+
+  // Load Excel data
+  const filePath = path.join(dirPath, `Laporan Diagnostik Kelas ${classGrade}.xlsx`);
+  if (!fsNode.existsSync(filePath)) {
+    if (pdfUrl) {
+      return {
+        grade: classGrade,
+        studentName: student.name,
+        sheetName: "Laporan PDF",
+        questions: [],
+        pdfUrl
+      };
+    }
+    return null;
+  }
+
+  try {
+    const XLSX = require("xlsx");
+    const workbook = XLSX.readFile(filePath);
+    const searchName = student.name.trim().toLowerCase();
+
+    for (const sheetName of workbook.SheetNames) {
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      if (rawData.length === 0) continue;
+
+      let studentColIndex = -1;
+      let kjColIndex = -1;
+      let compColIndex = -1;
+      let startRow = 1;
+
+      if (classGrade === "12") {
+        const headerRow = (rawData[0] as any[]) || [];
+        kjColIndex = headerRow.findIndex((cell: any) => String(cell).toUpperCase() === 'KJ');
+        compColIndex = headerRow.findIndex((cell: any) => String(cell).toLowerCase().includes('kompetensi'));
+
+        for (let c = 1; c < kjColIndex; c++) {
+          if (String(headerRow[c] || '').trim().toLowerCase() === searchName) {
+            studentColIndex = c;
+            break;
+          }
+        }
+        startRow = 1;
+      } else {
+        const colHeaderRow = (rawData[1] as any[]) || [];
+        const nameRow = (rawData[2] as any[]) || [];
+
+        kjColIndex = colHeaderRow.findIndex((cell: any) => {
+          const str = String(cell || '').toUpperCase();
+          return str.includes('KUNCI') || str === 'KJ';
+        });
+        compColIndex = colHeaderRow.findIndex((cell: any) => {
+          const str = String(cell || '').toUpperCase();
+          return str.includes('KOMPETENSI');
+        });
+
+        for (let c = 1; c < kjColIndex; c++) {
+          if (String(nameRow[c] || '').trim().toLowerCase() === searchName) {
+            studentColIndex = c;
+            break;
+          }
+        }
+        startRow = 3;
+      }
+
+      if (studentColIndex !== -1 && kjColIndex !== -1) {
+        const questions: any[] = [];
+        let currentSubject = "Umum";
+
+        for (let r = startRow; r < rawData.length; r++) {
+          const row = (rawData[r] as any[]) || [];
+          if (row.length === 0) continue;
+
+          const col0 = row[0];
+          const isQuestionRow = col0 !== undefined && col0 !== null && !isNaN(Number(col0));
+
+          if (!isQuestionRow) {
+            const potentialSubject = String(col0 || row[1] || '').trim();
+            if (potentialSubject && !potentialSubject.toLowerCase().includes('no') && !potentialSubject.toLowerCase().includes('nama')) {
+              currentSubject = potentialSubject;
+            }
+          } else {
+            const qNum = Number(col0);
+            const studentAns = String(row[studentColIndex] || '').trim();
+            const correctAns = String(row[kjColIndex] || '').trim();
+            const competency = String(row[compColIndex] || 'Kompetensi Umum').trim();
+
+            questions.push({
+              subject: currentSubject,
+              questionNumber: qNum,
+              studentAnswer: studentAns || "Kosong",
+              correctAnswer: correctAns,
+              isCorrect: studentAns.toUpperCase() === correctAns.toUpperCase() && studentAns !== "",
+              competency
+            });
+          }
+        }
+
+        return {
+          grade: classGrade,
+          studentName: student.name,
+          sheetName,
+          questions,
+          pdfUrl
+        };
+      }
+    }
+
+    if (pdfUrl) {
+      return {
+        grade: classGrade,
+        studentName: student.name,
+        sheetName: "Laporan PDF",
+        questions: [],
+        pdfUrl
+      };
+    }
+  } catch (err) {
+    console.error("Error parsing diagnostic report in Server Action:", err);
+  }
+  return null;
 }

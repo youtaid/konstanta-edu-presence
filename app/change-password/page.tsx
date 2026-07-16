@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EyeIcon, EyeOffIcon, LockKeyhole } from "lucide-react";
 
-export default function ChangePasswordPage() {
+function ChangePasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
@@ -143,5 +143,17 @@ export default function ChangePasswordPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function ChangePasswordPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen relative flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-sm text-gray-500 italic">Memuat halaman...</div>
+      </main>
+    }>
+      <ChangePasswordContent />
+    </Suspense>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { useEffect, useState } from "react";
-import { User } from "@/lib/types";
 import { mapProfileToUser } from "@/lib/profile-mapper";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import TeacherDashboard from "@/components/dashboards/teacher";
 import OrangTuaDashboard from "@/components/dashboards/orangtua";
 import SiswaDashboard from "@/components/dashboards/siswa";
 import EvalDashboard from "@/components/dashboards/eval";
+import KaryawanDashboard from "@/components/dashboards/karyawan";
 import {
   LogOut,
   Eye,
@@ -100,24 +100,6 @@ function PTNShowcase() {
         <p className="text-sm text-gray-500 mt-4 max-w-xs">
           KEMON mendukung seluruh tim Konstanta Education mengelola kehadiran, kinerja, dan evaluasi menuju target kelulusan ke kampus impian.
         </p>
-      </div>
-    </div>
-  );
-}
-
-function KaryawanDashboard({ user }: { user: User }) {
-  return (
-    <div className="bg-white rounded-3xl p-8 border border-white/60 shadow-[0_24px_50px_-12px_rgba(13,148,136,0.08)] backdrop-blur-xl">
-      <div className="max-w-md mx-auto text-center py-6">
-        <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-teal-100">
-          <Users className="w-8 h-8" />
-        </div>
-        <h2 className="text-3xl font-extrabold text-gray-800 tracking-tight">Halo, {user.name}!</h2>
-        <p className="text-sm text-gray-500 mt-2">Anda telah masuk dengan peran <b>Karyawan</b>.</p>
-        
-        <div className="mt-8 p-5 bg-teal-50/50 border border-teal-100/70 rounded-2xl text-teal-800 text-sm leading-relaxed shadow-sm">
-          Menu operasional dan pembagian tugas harian staf karyawan sedang dikonfigurasi oleh tim sistem. Silakan berkoordinasi dengan bagian Akademik atau Admin untuk instruksi kerja harian Anda.
-        </div>
       </div>
     </div>
   );
@@ -377,7 +359,7 @@ export default function Home() {
         {user?.role === "ACADEMIC" && <AcademicDashboard />}
         {user?.role === "TEACHER" && <TeacherDashboard />}
         {user?.role === "EVAL" && <EvalDashboard />}
-        {user?.role === "KARYAWAN" && <KaryawanDashboard user={user!} />}
+        {user?.role === "KARYAWAN" && <KaryawanDashboard />}
         {user?.role === "OTK" && <OrangTuaDashboard />}
         {user?.role === "KENZ" && <SiswaDashboard />}
       </main>

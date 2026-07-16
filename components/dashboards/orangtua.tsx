@@ -6,6 +6,9 @@ import type { Student } from "@/lib/types";
 import StudentProgressView from "@/components/student-progress-view";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { FileDown, FileSpreadsheet } from "lucide-react";
+import { formatStudentClassAndProgram } from "@/lib/format-utils";
 
 // getStudents() runs through the cookie-bound (RLS-respecting) client, so
 // it already returns only the children linked to this parent via
@@ -62,13 +65,26 @@ export default function OrangTuaDashboard() {
         </div>
       )}
       <Card>
-        <CardHeader>
-          <CardTitle>{selected.name}</CardTitle>
-          <div className="flex gap-2 mt-1">
-            <Badge variant="outline">{selected.program}</Badge>
-            {selected.className && (
-              <Badge variant="secondary">{selected.className}</Badge>
-            )}
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div>
+            <CardTitle className="text-xl font-bold">{selected.name}</CardTitle>
+            <div className="flex gap-2 mt-1.5">
+              <Badge variant="outline">
+                {formatStudentClassAndProgram(selected.program, selected.className)}
+              </Badge>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" asChild className="h-8 text-xs">
+              <a href={`/api/students/${selected.id}/report?format=pdf`} download>
+                <FileDown className="w-3.5 h-3.5 mr-1" /> Unduh PDF
+              </a>
+            </Button>
+            <Button variant="outline" size="sm" asChild className="h-8 text-xs">
+              <a href={`/api/students/${selected.id}/report?format=docx`} download>
+                <FileSpreadsheet className="w-3.5 h-3.5 mr-1" /> Unduh Word
+              </a>
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
