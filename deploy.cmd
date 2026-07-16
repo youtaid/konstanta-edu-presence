@@ -53,6 +53,9 @@ if not defined SUPABASE_SECRET_KEY if not defined SUPABASE_SERVICE_ROLE_KEY (
     pause
     exit /b 1
 )
+if not defined NEXT_PUBLIC_SITE_URL (
+    set "NEXT_PUBLIC_SITE_URL=https://konstanta.my.id"
+)
 echo    Konfigurasi Supabase wajib terdeteksi.
 
 REM === Git commit dan push ===
