@@ -48,8 +48,8 @@ if not defined NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (
     pause
     exit /b 1
 )
-if not defined SUPABASE_SECRET_KEY (
-    echo [ERROR] SUPABASE_SECRET_KEY kosong di .env.local.
+if not defined SUPABASE_SECRET_KEY if not defined SUPABASE_SERVICE_ROLE_KEY (
+    echo [ERROR] SUPABASE_SECRET_KEY atau SUPABASE_SERVICE_ROLE_KEY harus diisi di .env.local.
     pause
     exit /b 1
 )
@@ -86,7 +86,8 @@ set "ENVTMP=%TEMP%\konstanta-edu-presence-deploy.env"
 >> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_URL=!NEXT_PUBLIC_SUPABASE_URL!
 >> "%ENVTMP%" echo NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=!NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 >> "%ENVTMP%" echo NEXT_PUBLIC_WHATSAPP_NUMBER=!NEXT_PUBLIC_WHATSAPP_NUMBER!
->> "%ENVTMP%" echo SUPABASE_SECRET_KEY=!SUPABASE_SECRET_KEY!
+if defined SUPABASE_SECRET_KEY >> "%ENVTMP%" echo SUPABASE_SECRET_KEY=!SUPABASE_SECRET_KEY!
+if defined SUPABASE_SERVICE_ROLE_KEY >> "%ENVTMP%" echo SUPABASE_SERVICE_ROLE_KEY=!SUPABASE_SERVICE_ROLE_KEY!
 
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@148.230.98.96 "mkdir -p /var/www/konstanta-edu-presence && cd /var/www/konstanta-edu-presence && { [ -d .git ] || git clone github-konstanta:youtaid/konstanta-edu-presence.git .; }"
 if %errorlevel% neq 0 (
